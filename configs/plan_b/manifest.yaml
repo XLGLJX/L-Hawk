@@ -1,0 +1,124 @@
+defaults:
+  exp_dir: exp/plan-b-manifest
+  eval_dataset: coco
+  epochs: 1
+  train_batch: 1
+  eval_batch: 1
+  repeat: 1
+  trigger_source: laser
+  laser_model: linear
+  laser_color: green
+  laser_power: "29"
+  laser_distance: "30"
+  laser_angle: "18"
+  ambient_light: "1000"
+  trigger_height: 50
+  trigger_selection: epoch-search
+  trigger_search_metric: ASR
+  trigger_search_batch: 1
+
+profiles:
+  smoke:
+    epochs: 1
+    train_batch: 1
+    eval_batch: 1
+    repeat: 1
+    trigger_search_batch: 1
+    eval_dataset: coco
+  full:
+    epochs: 20
+    train_batch: 50
+    eval_batch: 800
+    repeat: 20
+    trigger_search_batch: 8
+
+experiments:
+  overall_tac:
+    description: TA-C overall classifier experiments.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [vgg13, vgg16, vgg19, res50, res101, res152, incv3, mobv2]
+    targets: ["920"]
+
+  overall_detectors_ca:
+    description: CA overall detector experiments.
+    cfg: configs/CA.yaml
+    attack: CA
+    models: [yolov3, yolov5, faster_rcnn]
+    targets: ["stop sign"]
+
+  overall_detectors_ha:
+    description: HA overall detector experiments.
+    cfg: configs/HA.yaml
+    attack: HA
+    models: [yolov3, yolov5, faster_rcnn]
+    targets: ["stop sign"]
+
+  overall_detectors_tad:
+    description: TA-D overall detector experiments.
+    cfg: configs/TA-D.yaml
+    attack: TA-D
+    models: [yolov3, yolov5, faster_rcnn]
+    origin: person
+    targets: ["stop sign"]
+
+  factor_power_tac:
+    description: Trigger power sweep for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      laser_power: ["10", "20", "30", "40", "50", "60", "70"]
+
+  factor_color_ca:
+    description: Trigger color sweep for CA.
+    cfg: configs/CA.yaml
+    attack: CA
+    models: [yolov5]
+    targets: ["stop sign"]
+    sweep:
+      laser_color: [green, red]
+
+  factor_trigger_width_tac:
+    description: Trigger width sweep for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      trigger_width: ["56", "112", "168", "224"]
+
+  factor_patch_size_tac:
+    description: Patch size sweep for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      patch_size: ["32", "48", "64", "80"]
+
+  transfer_tac_vgg_to_resnet:
+    description: Classifier transfer from VGG16 to ResNet-50.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [vgg16]
+    eval_models: [res50]
+    targets: ["920"]
+
+  transfer_ca_yolov5_to_yolov3:
+    description: Detector transfer from YOLOv5 to YOLOv3.
+    cfg: configs/CA.yaml
+    attack: CA
+    models: [yolov5]
+    eval_models: [yolov3]
+    targets: ["stop sign"]
+
+  ablation_tac:
+    description: TA-C ablation of trigger source and epoch trigger search.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      trigger_mode: [none, fixed, laser-random, laser-epoch-search]

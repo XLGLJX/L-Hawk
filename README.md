@@ -215,6 +215,24 @@ python scripts/run_plan_b_ablation.py \
   --target 920
 ```
 
+Plan-B manifest runner expands predefined paper-aligned experiment matrices:
+
+```bash
+# List available manifest experiments.
+python scripts/run_plan_b_manifest.py --list
+
+# Dry-run smoke commands for selected experiments.
+python scripts/run_plan_b_manifest.py \
+  --profile smoke \
+  --experiments overall_tac,factor_power_tac \
+  --dry-run
+
+# Full profile uses 20 epochs, 50 training batches, and 800 eval samples.
+python scripts/run_plan_b_manifest.py \
+  --profile full \
+  --experiments factor_power_tac
+```
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 
