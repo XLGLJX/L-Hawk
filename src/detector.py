@@ -447,8 +447,8 @@ class YOLOv3(nn.Module):
 class FasterRCNN(nn.Module):
     def __init__(self, device):
         super().__init__()
-        self.model = tv.models.detection.fasterrcnn_resnet50_fpn(pretrained=False,
-                                                                 # pretrained_backbone=False,
+        self.model = tv.models.detection.fasterrcnn_resnet50_fpn(weights=None,
+                                                                 weights_backbone=None,
                                                                  min_size=640,
                                                                  max_size=640)
         self.model.roi_heads.score_thresh = 0.25

@@ -41,6 +41,11 @@ python demo.py --cfg configs/CA.yaml --attack_type CA --det yolov5 --target "sto
 # Quick smoke-sized run. Use this to validate paths before full experiments.
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
   --epochs 1 --train-batch 1 --eval-batch 1 --repeat 1
+
+# Detector smoke-sized run using COCO as the evaluation source.
+# Use KITTI/BDD100K for the normal detector evaluation once those datasets are linked.
+python demo.py --cfg configs/CA.yaml --attack_type CA --det yolov5 --target "stop sign" \
+  --eval-dataset coco --epochs 1 --train-batch 1 --eval-batch 1 --repeat 1
 ```
 
 Each run writes its generated patches, `run_config.json`, and `metrics.csv` under `exp/`.
@@ -54,7 +59,8 @@ python scripts/run_digital_experiments.py \
   --classifiers vgg16,res50 \
   --detectors yolov5 \
   --classifier-targets 920 \
-  --detector-targets "stop sign"
+  --detector-targets "stop sign" \
+  --eval-dataset coco
 ```
 
 Add `--dry-run` to print the commands without executing them.

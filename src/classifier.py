@@ -57,28 +57,28 @@ class EnsembleModel(nn.Module):
 
 def get_cls_model(device, model_type) -> BaseClassifier:
     if model_type == "vgg13":
-        model = tv.models.vgg13_bn(pretrained=False)
+        model = tv.models.vgg13_bn(weights=None)
         model.load_state_dict(torch.load("detlib/weights/vgg13.pth"))
     elif model_type == "vgg16":
-        model = tv.models.vgg16_bn(pretrained=False)
+        model = tv.models.vgg16_bn(weights=None)
         model.load_state_dict(torch.load("detlib/weights/vgg16.pth"))
     elif model_type == "vgg19":
-        model = tv.models.vgg19_bn(pretrained=False)
+        model = tv.models.vgg19_bn(weights=None)
         model.load_state_dict(torch.load("detlib/weights/vgg19.pth"))
     elif model_type == "res50":
-        model = tv.models.resnet50(pretrained=False)
+        model = tv.models.resnet50(weights=None)
         model.load_state_dict(torch.load("detlib/weights/res50.pth"))
     elif model_type == "res101":
-        model = tv.models.resnet101(pretrained=False)
+        model = tv.models.resnet101(weights=None)
         model.load_state_dict(torch.load("detlib/weights/res101.pth"))
     elif model_type == "res152":
-        model = tv.models.resnet152(pretrained=False)
+        model = tv.models.resnet152(weights=None)
         model.load_state_dict(torch.load("detlib/weights/res152.pth"))
     elif model_type == "incv3":
-        model = tv.models.inception_v3(pretrained=False)
+        model = tv.models.inception_v3(weights=None)
         model.load_state_dict(torch.load("detlib/weights/incv3.pth"))
     elif model_type == "mobv2":
-        model = tv.models.mobilenet_v2(pretrained=False)
+        model = tv.models.mobilenet_v2(weights=None)
         model.load_state_dict(torch.load("detlib/weights/mobv2.pth"))
     else:
         raise NotImplementedError

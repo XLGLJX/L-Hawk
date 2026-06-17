@@ -11,6 +11,8 @@ class Background(Dataset):
         self.img_names = sorted(glob(os.path.join(path, "*.png")))
         if len(self.img_names) == 0:
             self.img_names = sorted(glob(os.path.join(path, "*.jpg")))
+        if len(self.img_names) == 0:
+            raise FileNotFoundError(f"No .png or .jpg images found in evaluation directory: {path}")
         self.transform = tv.transforms.Compose([
             tv.transforms.Resize(size),
             tv.transforms.CenterCrop((size, size)),

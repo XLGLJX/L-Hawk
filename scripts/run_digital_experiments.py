@@ -85,7 +85,7 @@ def main():
     parser.add_argument("--train-batch", type=int)
     parser.add_argument("--eval-batch", type=int)
     parser.add_argument("--repeat", type=int)
-    parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k"), default="kitti")
+    parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="kitti")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

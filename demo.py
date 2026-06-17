@@ -5,8 +5,12 @@ import csv
 import json
 import os
 import random
+import re
 from pathlib import Path
 import numpy as np
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+
 from src.detector import *
 from src.train_eval import *
 from src.kitti_bdd100k import *
@@ -36,7 +40,9 @@ parser.add_argument('--epochs', type=int, default=None)
 parser.add_argument('--train-batch', type=int, default=None)
 parser.add_argument('--eval-batch', type=int, default=None)
 parser.add_argument('--repeat', type=int, default=None)
-parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k"), default="kitti")
+parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k", "coco"), default="kitti")
+parser.add_argument('--content-pretrained', action="store_true",
+                    help='Use torchvision pretrained VGG19 for content loss; may require cached/downloaded weights.')
 args = parser.parse_args()
 
 
@@ -87,9 +93,18 @@ def append_metrics(save_path, metrics):
         writer.writerow(metrics)
 
 
+def slugify(value):
+    if isinstance(value, (list, tuple)):
+        value = "-".join(str(v) for v in value)
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value))
+    return value.strip("_") or "none"
+
+
 set_seed(args.seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
+if device.type != "cuda":
+    sys.exit("CUDA is required for the digital experiments in this project.")
 if args.target != None:
     try:
         args.target = int(args.target)
@@ -119,7 +134,9 @@ logger(cfg, args)
 
 if cfg.ATTACKER.TYPE != "TA-C":
     train_dataloader = load_coco(cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR)
-    if args.eval_dataset == "bdd100k":
+    if args.eval_dataset == "coco":
+        evaluate_dataloader = load_coco(cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR)
+    elif args.eval_dataset == "bdd100k":
         evaluate_dataloader = load_bdd100k(cfg=cfg)
     else:
         evaluate_dataloader = load_kitti(cfg=cfg)
@@ -155,7 +172,10 @@ else:
     trigger_mask = generate_trigger_tensor(folder_path, isdetector=False)
 
 # Cal Content Loss through VGG19 Network proposed by TPatch
-a = tv.models.vgg19(True).to(device)
+if args.content_pretrained:
+    a = tv.models.vgg19(weights=tv.models.VGG19_Weights.DEFAULT).to(device)
+else:
+    a = tv.models.vgg19(weights=None).to(device)
 content_loss = ContentLoss(a.features, cfg.ATTACKER.PATCH.CONTENT, device, extract_layer=11)
 tv_loss = TVLoss()
 
@@ -167,7 +187,15 @@ elif cfg.ATTACKER.TYPE == "CA" or cfg.ATTACKER.TYPE == "TA-D":
 elif cfg.ATTACKER.TYPE == "TA-C":
     nps_loss = NPS_Loss("src/printability/30values.txt", bgsize_TA_Cls).to(device)
 
-save_path = os.path.join(args.exp_dir, f"train_{time_str}_{cfg.ATTACKER.TYPE}_{cfg.DETECTOR.NAME}_{cfg.ATTACKER.TARGET_LABEL}")
+save_path = os.path.join(
+    args.exp_dir,
+    "train_{}_{}_{}_{}".format(
+        time_str,
+        slugify(cfg.ATTACKER.TYPE),
+        slugify(cfg.DETECTOR.NAME),
+        slugify(cfg.ATTACKER.TARGET_LABEL),
+    ),
+)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 write_run_metadata(save_path, cfg, args, time_str)
