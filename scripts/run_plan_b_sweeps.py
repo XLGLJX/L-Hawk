@@ -29,7 +29,8 @@ def tracking_args(args, sweep_value):
     ]
 
 
-def common_demo_args(args, sweep_value):
+def common_demo_args(args, sweep_value, overrides=None):
+    overrides = overrides or {}
     cmd = [
         sys.executable,
         "demo.py",
@@ -47,10 +48,11 @@ def common_demo_args(args, sweep_value):
         *tracking_args(args, sweep_value),
         "--trigger-source", "laser",
         "--laser-model", args.laser_model,
-        "--laser-color", args.laser_color,
-        "--laser-distance", args.laser_distance,
-        "--laser-angle", args.laser_angle,
-        "--ambient-light", args.ambient_light,
+        "--laser-color", str(overrides.get("laser_color", args.laser_color)),
+        "--laser-power", str(overrides.get("laser_power", args.laser_power)),
+        "--laser-distance", str(overrides.get("laser_distance", args.laser_distance)),
+        "--laser-angle", str(overrides.get("laser_angle", args.laser_angle)),
+        "--ambient-light", str(overrides.get("ambient_light", args.ambient_light)),
         "--trigger-height", str(args.trigger_height),
         "--trigger-selection", args.trigger_selection,
         "--trigger-search-metric", args.trigger_search_metric,
@@ -69,41 +71,46 @@ def build_commands(args):
     commands = []
     if args.sweep == "power":
         for power in split_csv(args.values):
-            cmd = common_demo_args(args, power)
-            cmd.extend(["--laser-power", power])
-            commands.append(cmd)
+            commands.append(common_demo_args(args, power, {"laser_power": power}))
     elif args.sweep == "color":
         for color in split_csv(args.values):
-            cmd = common_demo_args(args, color)
-            cmd.extend(["--laser-color", color, "--laser-power", args.laser_power])
-            commands.append(cmd)
+            commands.append(common_demo_args(args, color, {"laser_color": color}))
+    elif args.sweep == "distance":
+        for distance in split_csv(args.values):
+            commands.append(common_demo_args(args, distance, {"laser_distance": distance}))
+    elif args.sweep == "angle":
+        for angle in split_csv(args.values):
+            commands.append(common_demo_args(args, angle, {"laser_angle": angle}))
+    elif args.sweep == "ambient-light":
+        for light in split_csv(args.values):
+            commands.append(common_demo_args(args, light, {"ambient_light": light}))
     elif args.sweep == "position":
         for position in split_csv(args.values):
             cmd = common_demo_args(args, position)
-            cmd.extend(["--laser-power", args.laser_power, "--trigger-position", position])
+            cmd.extend(["--trigger-position", position])
             if args.trigger_width is not None:
                 cmd.extend(["--trigger-width", str(args.trigger_width)])
             commands.append(cmd)
     elif args.sweep == "width":
         for width in split_csv(args.values):
             cmd = common_demo_args(args, width)
-            cmd.extend(["--laser-power", args.laser_power, "--trigger-width", width])
+            cmd.extend(["--trigger-width", width])
             cmd.extend(["--trigger-position", str(args.trigger_position)])
             commands.append(cmd)
     elif args.sweep == "patch-size":
         for patch_size in split_csv(args.values):
             cmd = common_demo_args(args, patch_size)
-            cmd.extend(["--laser-power", args.laser_power, "--patch-size", patch_size])
+            cmd.extend(["--patch-size", patch_size])
             commands.append(cmd)
     elif args.sweep == "patch-left":
         for patch_left in split_csv(args.values):
             cmd = common_demo_args(args, patch_left)
-            cmd.extend(["--laser-power", args.laser_power, "--patch-left", patch_left])
+            cmd.extend(["--patch-left", patch_left])
             commands.append(cmd)
     elif args.sweep == "patch-top":
         for patch_top in split_csv(args.values):
             cmd = common_demo_args(args, patch_top)
-            cmd.extend(["--laser-power", args.laser_power, "--patch-top", patch_top])
+            cmd.extend(["--patch-top", patch_top])
             commands.append(cmd)
     else:
         raise ValueError(f"Unsupported sweep: {args.sweep}")
@@ -112,7 +119,11 @@ def build_commands(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Run plan-B digital reproduction sweeps.")
-    parser.add_argument("--sweep", choices=("power", "color", "position", "width", "patch-size", "patch-left", "patch-top"), required=True)
+    parser.add_argument("--sweep",
+                        choices=(
+                            "power", "color", "distance", "angle", "ambient-light",
+                            "position", "width", "patch-size", "patch-left", "patch-top"),
+                        required=True)
     parser.add_argument("--values", required=True,
                         help="Comma-separated sweep values, e.g. '10,20,30' or 'green,red'.")
     parser.add_argument("--cfg", default="configs/TA-C.yaml")

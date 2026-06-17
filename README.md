@@ -152,6 +152,11 @@ python scripts/run_plan_b_sweeps.py \
   --attack TA-C \
   --model res50 \
   --target 920
+
+# Laser distance / incidence-angle / ambient-light sweeps can be launched with:
+python scripts/run_plan_b_sweeps.py --sweep distance --values 10,15,20,25,30
+python scripts/run_plan_b_sweeps.py --sweep angle --values 0,15,30,45
+python scripts/run_plan_b_sweeps.py --sweep ambient-light --values 1238,719,461,198,0
 ```
 
 Collect completed sweep results:
