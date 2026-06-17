@@ -77,6 +77,9 @@ def build_commands(args):
                 cmd.extend(["--trigger-position", str(args.trigger_position)])
                 if args.trigger_noise_std:
                     cmd.extend(["--trigger-noise-std", str(args.trigger_noise_std)])
+                cmd.extend(["--trigger-selection", args.trigger_selection])
+                cmd.extend(["--trigger-search-metric", args.trigger_search_metric])
+                cmd.extend(["--trigger-search-batch", str(args.trigger_search_batch)])
                 commands.append(cmd)
     return commands
 
@@ -114,6 +117,9 @@ def main():
     parser.add_argument("--trigger-width", type=int)
     parser.add_argument("--trigger-position", type=float, default=0.5)
     parser.add_argument("--trigger-noise-std", type=float, default=0.0)
+    parser.add_argument("--trigger-selection", choices=("random", "epoch-search"), default="random")
+    parser.add_argument("--trigger-search-metric", choices=("ASR", "Triggered", "No_triggered"), default="ASR")
+    parser.add_argument("--trigger-search-batch", type=int, default=8)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

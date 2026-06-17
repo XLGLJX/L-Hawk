@@ -71,6 +71,9 @@ parser.add_argument('--laser-k1', type=float, default=12.0)
 parser.add_argument('--laser-k2', type=float, default=2.0e-5)
 parser.add_argument('--laser-k3', type=float, default=4.0)
 parser.add_argument('--laser-k4', type=float, default=1.0e-5)
+parser.add_argument('--trigger-selection', choices=("random", "epoch-search"), default="random")
+parser.add_argument('--trigger-search-metric', choices=("ASR", "Triggered", "No_triggered"), default="ASR")
+parser.add_argument('--trigger-search-batch', type=int, default=8)
 args = parser.parse_args()
 
 
@@ -119,6 +122,67 @@ def append_metrics(save_path, metrics):
         if not exists:
             writer.writeheader()
         writer.writerow(metrics)
+
+
+def append_trigger_selection(save_path, row):
+    path = os.path.join(save_path, "trigger_selection.csv")
+    fieldnames = [
+        "epoch", "selected_index", "metric", "metric_value",
+        "ASR", "No_triggered", "Triggered",
+    ]
+    exists = os.path.exists(path)
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not exists:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def select_trigger_candidate(
+    cfg,
+    model,
+    relpos,
+    relpos3,
+    patch,
+    patch2,
+    trigger_mask,
+    quick_load,
+    evaluate_dataloader,
+    epoch,
+    save_path,
+    metric,
+    search_batch,
+):
+    best_index = 0
+    best_metrics = None
+    best_value = None
+    with torch.no_grad():
+        for idx in range(trigger_mask.size(0)):
+            candidate = torch.index_select(
+                trigger_mask, 0, torch.tensor([idx], device=trigger_mask.device))
+            metrics = eval(
+                cfg, model, relpos, relpos3, patch, patch2, candidate, quick_load,
+                evaluate_dataloader, epoch, eval_batch=search_batch, quiet=True)
+            metric_value = metrics[metric]
+            if best_value is None or metric_value > best_value:
+                best_index = idx
+                best_metrics = metrics
+                best_value = metric_value
+    append_trigger_selection(save_path, {
+        "epoch": epoch,
+        "selected_index": best_index,
+        "metric": metric,
+        "metric_value": best_value,
+        "ASR": best_metrics["ASR"],
+        "No_triggered": best_metrics["No_triggered"],
+        "Triggered": best_metrics["Triggered"],
+    })
+    print(
+        f"Selected trigger {best_index} by {metric}={best_value} "
+        f"(ASR={best_metrics['ASR']}, Triggered={best_metrics['Triggered']})"
+    )
+    return torch.index_select(
+        trigger_mask, 0, torch.tensor([best_index], device=trigger_mask.device))
 
 
 def slugify(value):
@@ -262,11 +326,22 @@ elif cfg.ATTACKER.TYPE == "TA-C":
                    eot_angle=cfg.ATTACKER.PATCH.ANGLE, p=1)
 
 for e in range(1, cfg.ATTACKER.EPOCH + 1):
-    train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, content_loss, tv_loss, nps_loss, quick_load, train_dataloader, device, e)
+    if args.trigger_selection == "epoch-search" and trigger_mask.size(0) > 1:
+        train_trigger_mask = select_trigger_candidate(
+            cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load,
+            evaluate_dataloader, e, save_path, args.trigger_search_metric,
+            args.trigger_search_batch)
+    else:
+        train_trigger_mask = trigger_mask
+    train(cfg, model, relpos, relpos3, patch, patch2, train_trigger_mask, content_loss, tv_loss, nps_loss, quick_load, train_dataloader, device, e)
     with torch.no_grad():
-        random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
-        print(f"Select {random_index.item()} mask for Eval.")
-        selected_mask = torch.index_select(trigger_mask, 0, random_index)
+        if train_trigger_mask.size(0) == 1:
+            selected_mask = train_trigger_mask
+            print("Use selected trigger mask for Eval.")
+        else:
+            random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
+            print(f"Select {random_index.item()} mask for Eval.")
+            selected_mask = torch.index_select(trigger_mask, 0, random_index)
         metrics = eval(cfg, model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
         append_metrics(save_path, metrics)
     patch.save(os.path.join(save_path, f"p_epoch{e}.png"))

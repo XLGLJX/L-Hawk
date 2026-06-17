@@ -80,14 +80,16 @@ def train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask,
             torch.cuda.empty_cache()
 
 
-def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, test_loader, e):
+def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, test_loader, e,
+         eval_batch=None, quiet=False):
     model.eval()
     success, success_1, success_2 = 0, 0, 0
-    set_resize = torch.empty(cfg.ATTACKER.EVAL_BATCH, device=patch.device).uniform_(
+    total_eval = eval_batch or cfg.ATTACKER.EVAL_BATCH
+    set_resize = torch.empty(total_eval, device=patch.device).uniform_(
         cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
-    set_rotate = torch.empty(cfg.ATTACKER.EVAL_BATCH, device=patch.device).uniform_(
+    set_rotate = torch.empty(total_eval, device=patch.device).uniform_(
         -cfg.EVAL.ANGLE_EVAL, cfg.EVAL.ANGLE_EVAL)
-    for i, img in tqdm(enumerate(test_loader), desc=f'Testing epoch {e}', total=cfg.ATTACKER.EVAL_BATCH):
+    for i, img in tqdm(enumerate(test_loader), desc=f'Testing epoch {e}', total=total_eval, disable=quiet):
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
         img = img.to(patch.device)
@@ -175,24 +177,25 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
         success += s
         success_1 += s1
         success_2 += s2
-        if (i + 1) == cfg.ATTACKER.EVAL_BATCH:
+        if (i + 1) == total_eval:
             break
         else:
             del imgn, imgp, gt_box, pred1, pred2
             torch.cuda.empty_cache()
     metrics = {
         "epoch": e,
-        "samples": cfg.ATTACKER.EVAL_BATCH,
+        "samples": total_eval,
         "success": success,
         "no_triggered_success": success_1,
         "triggered_success": success_2,
-        "ASR": success / cfg.ATTACKER.EVAL_BATCH,
-        "No_triggered": success_1 / cfg.ATTACKER.EVAL_BATCH,
-        "Triggered": success_2 / cfg.ATTACKER.EVAL_BATCH,
+        "ASR": success / total_eval,
+        "No_triggered": success_1 / total_eval,
+        "Triggered": success_2 / total_eval,
     }
-    print(
-        f"ASR: {metrics['ASR']}; "
-        f"No_triggered: {metrics['No_triggered']}; "
-        f"Triggered: {metrics['Triggered']}"
-    )
+    if not quiet:
+        print(
+            f"ASR: {metrics['ASR']}; "
+            f"No_triggered: {metrics['No_triggered']}; "
+            f"Triggered: {metrics['Triggered']}"
+        )
     return metrics

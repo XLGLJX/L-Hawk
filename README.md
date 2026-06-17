@@ -90,6 +90,20 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 9
 For red-trigger experiments, use `--laser-color red`. For incidence-shape
 experiments, change `--laser-model` to `sigmoid` or `gaussian`.
 
+To approximate the paper's asynchronous trigger/patch optimization loop, use
+`--trigger-selection epoch-search`. At the beginning of each epoch, the runner
+evaluates the current patch against the generated trigger candidates and trains
+that epoch with the best candidate according to `--trigger-search-metric`.
+
+```bash
+python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
+  --trigger-source laser \
+  --laser-power 10:70:10 \
+  --trigger-selection epoch-search \
+  --trigger-search-metric ASR \
+  --trigger-search-batch 8
+```
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 
