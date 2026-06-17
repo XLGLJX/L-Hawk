@@ -162,6 +162,27 @@ python scripts/collect_plan_b_results.py \
   --output exp/plan-b/summary.csv
 ```
 
+Plot collected results:
+
+```bash
+# Bar chart for a single sweep axis.
+python scripts/plot_plan_b_results.py \
+  --summary exp/plan-b/summary.csv \
+  --plot bar \
+  --x selected_power_mw \
+  --y ASR \
+  --output exp/plan-b/power_asr.png
+
+# Heatmap for two sweep axes.
+python scripts/plot_plan_b_results.py \
+  --summary exp/plan-b/summary.csv \
+  --plot heatmap \
+  --x patch_left \
+  --heatmap-y selected_power_mw \
+  --y ASR \
+  --output exp/plan-b/power_patch_left_asr.png
+```
+
 Transfer tests use `--eval-det` to train on one model and evaluate on another:
 
 ```bash
