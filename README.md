@@ -18,7 +18,10 @@ The CUDA environment (CUDA 11.7) for Pytorch will be installed.
 We also successfully run the code under those environments with higher Pytorch and CUDA version.
 
 ## Datasets Setting
-The detailed three dateset (including KITTI, BDD100K, and ImageNet) building is available in [README](./datasets/README.md).
+For this reproduction branch, the digital experiments use ImageNet for
+classifier attacks and COCO val2014 for detector attacks. KITTI and BDD100K
+paths are still supported by the original loaders, but they are not required for
+the Plan-B reproduction commands documented below.
 
 ## Victim Models
 The target models include `YOLO V3/V5`, `Faster R-CNN`, `VGG-13/16/19`, `ResNet-50/101/152`, `Inception-v3`, and `MobileNet-v2`.
@@ -35,7 +38,7 @@ Examples:
 # TA-C against a single classifier target.
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920
 
-# CA against YOLOv5 on KITTI evaluation images.
+# CA against YOLOv5 on COCO evaluation images.
 python demo.py --cfg configs/CA.yaml --attack_type CA --det yolov5 --target "stop sign"
 
 # Quick smoke-sized run. Use this to validate paths before full experiments.
@@ -43,7 +46,6 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 9
   --epochs 1 --train-batch 1 --eval-batch 1 --repeat 1
 
 # Detector smoke-sized run using COCO as the evaluation source.
-# Use KITTI/BDD100K for the normal detector evaluation once those datasets are linked.
 python demo.py --cfg configs/CA.yaml --attack_type CA --det yolov5 --target "stop sign" \
   --eval-dataset coco --epochs 1 --train-batch 1 --eval-batch 1 --repeat 1
 ```
@@ -224,7 +226,7 @@ python demo.py --cfg configs/CA.yaml --attack_type CA \
   --det yolov5 \
   --eval-det yolov3 \
   --target "stop sign" \
-  --eval-dataset kitti \
+  --eval-dataset coco \
   --trigger-source laser \
   --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
 ```

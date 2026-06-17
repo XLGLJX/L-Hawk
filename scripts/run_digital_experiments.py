@@ -115,7 +115,7 @@ def main():
     parser.add_argument("--train-batch", type=int)
     parser.add_argument("--eval-batch", type=int)
     parser.add_argument("--repeat", type=int)
-    parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="kitti")
+    parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="coco")
     parser.add_argument("--trigger-source", choices=("none", "fixed", "laser"), default="fixed")
     parser.add_argument("--laser-model", choices=("linear", "sigmoid", "gaussian"), default="linear")
     parser.add_argument("--laser-color", choices=("green", "red", "white"), default="green")

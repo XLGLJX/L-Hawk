@@ -54,7 +54,7 @@ parser.add_argument('--epochs', type=int, default=None)
 parser.add_argument('--train-batch', type=int, default=None)
 parser.add_argument('--eval-batch', type=int, default=None)
 parser.add_argument('--repeat', type=int, default=None)
-parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k", "coco"), default="kitti")
+parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k", "coco"), default="coco")
 parser.add_argument('--content-pretrained', action="store_true",
                     help='Use torchvision pretrained VGG19 for content loss; may require cached/downloaded weights.')
 parser.add_argument('--trigger-source', choices=("none", "fixed", "laser"), default="fixed")
