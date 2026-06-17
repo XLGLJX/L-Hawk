@@ -51,7 +51,7 @@ parser.add_argument('--repeat', type=int, default=None)
 parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k", "coco"), default="kitti")
 parser.add_argument('--content-pretrained', action="store_true",
                     help='Use torchvision pretrained VGG19 for content loss; may require cached/downloaded weights.')
-parser.add_argument('--trigger-source', choices=("fixed", "laser"), default="fixed")
+parser.add_argument('--trigger-source', choices=("none", "fixed", "laser"), default="fixed")
 parser.add_argument('--laser-model', choices=("linear", "sigmoid", "gaussian"), default="linear")
 parser.add_argument('--laser-color', choices=("green", "red", "white"), default="green")
 parser.add_argument('--laser-power', default="29",
@@ -303,6 +303,10 @@ if args.trigger_source == "fixed":
         trigger_mask = generate_trigger_tensor(folder_path)
     else:
         trigger_mask = generate_trigger_tensor(folder_path, isdetector=False)
+elif args.trigger_source == "none":
+    trigger_shape = (1, 3, 640, 640) if is_detector_attack else (1, 3, 224, 224)
+    trigger_mask = torch.zeros(trigger_shape, device=device)
+    print(f"Generated zero trigger tensor with shape: {trigger_mask.shape}")
 else:
     trigger_params = build_laser_param_grid(
         powers=parse_float_spec(args.laser_power),

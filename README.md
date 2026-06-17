@@ -183,6 +183,17 @@ python demo.py --cfg configs/CA.yaml --attack_type CA \
   --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
 ```
 
+Plan-B ablations compare trigger sources and the epoch trigger search:
+
+```bash
+python scripts/run_plan_b_ablation.py \
+  --modes none,fixed,laser-random,laser-epoch-search \
+  --cfg configs/TA-C.yaml \
+  --attack TA-C \
+  --model res50 \
+  --target 920
+```
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 
