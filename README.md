@@ -264,6 +264,7 @@ python scripts/plot_plan_b_results.py \
   --x patch_left \
   --heatmap-y laser_power \
   --y ASR \
+  --where experiment_name=factor_power_patch_left_tac \
   --output exp/plan-b-manifest/power_patch_left_asr.png
 
 python scripts/plot_plan_b_results.py \
@@ -272,7 +273,19 @@ python scripts/plot_plan_b_results.py \
   --x trigger_position \
   --heatmap-y trigger_width \
   --y ASR \
+  --where experiment_name=factor_trigger_position_width_tac \
   --output exp/plan-b-manifest/trigger_position_width_asr.png
+
+python scripts/plot_plan_b_results.py \
+  --summary exp/plan-b-manifest/summary.csv \
+  --plot heatmap \
+  --x laser_distance \
+  --heatmap-y laser_angle \
+  --y ASR \
+  --where experiment_name=factor_power_distance_angle_tac \
+  --where laser_power=50 \
+  --title "power=50 mW" \
+  --output exp/plan-b-manifest/distance_angle_power50_asr.png
 ```
 
 ## Physical Attack Demo
