@@ -9,7 +9,7 @@ def split_csv(value):
 
 
 def common_demo_args(args):
-    return [
+    cmd = [
         sys.executable,
         "demo.py",
         "--cfg", args.cfg,
@@ -34,6 +34,11 @@ def common_demo_args(args):
         "--trigger-search-metric", args.trigger_search_metric,
         "--trigger-search-batch", str(args.trigger_search_batch),
     ]
+    if args.patch_top is not None:
+        cmd.extend(["--patch-top", str(args.patch_top)])
+    if args.patch_left is not None:
+        cmd.extend(["--patch-left", str(args.patch_left)])
+    return cmd
 
 
 def build_commands(args):
@@ -66,6 +71,16 @@ def build_commands(args):
             cmd = common_demo_args(args)
             cmd.extend(["--laser-power", args.laser_power, "--patch-size", patch_size])
             commands.append(cmd)
+    elif args.sweep == "patch-left":
+        for patch_left in split_csv(args.values):
+            cmd = common_demo_args(args)
+            cmd.extend(["--laser-power", args.laser_power, "--patch-left", patch_left])
+            commands.append(cmd)
+    elif args.sweep == "patch-top":
+        for patch_top in split_csv(args.values):
+            cmd = common_demo_args(args)
+            cmd.extend(["--laser-power", args.laser_power, "--patch-top", patch_top])
+            commands.append(cmd)
     else:
         raise ValueError(f"Unsupported sweep: {args.sweep}")
     return commands
@@ -73,7 +88,7 @@ def build_commands(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Run plan-B digital reproduction sweeps.")
-    parser.add_argument("--sweep", choices=("power", "color", "position", "width", "patch-size"), required=True)
+    parser.add_argument("--sweep", choices=("power", "color", "position", "width", "patch-size", "patch-left", "patch-top"), required=True)
     parser.add_argument("--values", required=True,
                         help="Comma-separated sweep values, e.g. '10,20,30' or 'green,red'.")
     parser.add_argument("--cfg", default="configs/TA-C.yaml")
@@ -99,6 +114,8 @@ def main():
     parser.add_argument("--trigger-selection", choices=("random", "epoch-search"), default="epoch-search")
     parser.add_argument("--trigger-search-metric", choices=("ASR", "Triggered", "No_triggered"), default="ASR")
     parser.add_argument("--trigger-search-batch", type=int, default=8)
+    parser.add_argument("--patch-top", type=int)
+    parser.add_argument("--patch-left", type=int)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

@@ -197,6 +197,19 @@ class LHawk:
         return mask, padding
 
     def random_pos(self, cfg, shape: torch.Size) -> Tuple[int, int]:
+        fixed_top = getattr(cfg.ATTACKER, "FIXED_TOP", None)
+        fixed_left = getattr(cfg.ATTACKER, "FIXED_LEFT", None)
+        if fixed_top is not None or fixed_left is not None:
+            if cfg.ATTACKER.TYPE != "TA-C":
+                default_top = 220
+            else:
+                default_top = random.randint(0, shape[-2] - self.h)
+            default_left = random.randint(0, shape[-1] - self.w)
+            h = default_top if fixed_top is None else int(fixed_top)
+            w = default_left if fixed_left is None else int(fixed_left)
+            h = max(0, min(h, shape[-2] - self.h))
+            w = max(0, min(w, shape[-1] - self.w))
+            return h, w
         if cfg.ATTACKER.TYPE != "TA-C":
             h = random.randint(220, 220)
             w = random.randint(0, shape[-1] - self.w)

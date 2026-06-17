@@ -76,6 +76,10 @@ parser.add_argument('--trigger-search-metric', choices=("ASR", "Triggered", "No_
 parser.add_argument('--trigger-search-batch', type=int, default=8)
 parser.add_argument('--patch-size', type=int, default=None,
                     help="Override the attack patch size with a square patch.")
+parser.add_argument('--patch-top', type=int, default=None,
+                    help="Fix patch top coordinate for position sweeps.")
+parser.add_argument('--patch-left', type=int, default=None,
+                    help="Fix patch left coordinate for position sweeps.")
 args = parser.parse_args()
 
 
@@ -236,6 +240,8 @@ if args.eval_batch is not None:
     cfg.ATTACKER.EVAL_BATCH = args.eval_batch
 if args.repeat is not None:
     cfg.ATTACKER.REPEAT = args.repeat
+cfg.ATTACKER.FIXED_TOP = args.patch_top
+cfg.ATTACKER.FIXED_LEFT = args.patch_left
 
 print(f"Start Time: {time_str}_{cfg.ATTACKER.TYPE}_{cfg.DETECTOR.NAME}_{cfg.ATTACKER.TARGET_LABEL}")
 logger(cfg, args)

@@ -143,6 +143,23 @@ python scripts/run_plan_b_sweeps.py \
   --attack TA-C \
   --model res50 \
   --target 920
+
+# Patch lateral-position sweep.
+python scripts/run_plan_b_sweeps.py \
+  --sweep patch-left \
+  --values 0,32,64,96 \
+  --cfg configs/TA-C.yaml \
+  --attack TA-C \
+  --model res50 \
+  --target 920
+```
+
+Collect completed sweep results:
+
+```bash
+python scripts/collect_plan_b_results.py \
+  --root exp/plan-b \
+  --output exp/plan-b/summary.csv
 ```
 
 ## Physical Attack Demo
