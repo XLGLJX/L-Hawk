@@ -1,7 +1,12 @@
 import sys
 import time
 import argparse
+import csv
+import json
+import os
+import random
 from pathlib import Path
+import numpy as np
 from src.detector import *
 from src.train_eval import *
 from src.kitti_bdd100k import *
@@ -26,8 +31,63 @@ parser.add_argument('--attack_type', type=str, default=None)
 parser.add_argument('--target', type=str, default=None)
 parser.add_argument('--origin', type=str, default="stop sign")
 parser.add_argument('--det', type=str, default=None)
+parser.add_argument('--seed', type=int, default=0)
+parser.add_argument('--epochs', type=int, default=None)
+parser.add_argument('--train-batch', type=int, default=None)
+parser.add_argument('--eval-batch', type=int, default=None)
+parser.add_argument('--repeat', type=int, default=None)
+parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k"), default="kitti")
 args = parser.parse_args()
 
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def to_plain(value):
+    if hasattr(value, "__dict__"):
+        return {k: to_plain(v) for k, v in value.__dict__.items()}
+    if isinstance(value, (list, tuple)):
+        return [to_plain(v) for v in value]
+    return value
+
+
+def write_run_metadata(save_path, cfg, args, time_str):
+    metadata = {
+        "time": time_str,
+        "args": vars(args),
+        "config": {
+            "DATA": to_plain(cfg.DATA),
+            "DETECTOR": to_plain(cfg.DETECTOR),
+            "ATTACKER": to_plain(cfg.ATTACKER),
+            "EVAL": to_plain(cfg.EVAL),
+            "target_index": cfg.target_index,
+            "origin_index": cfg.origin_index,
+        },
+    }
+    with open(os.path.join(save_path, "run_config.json"), "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+
+def append_metrics(save_path, metrics):
+    path = os.path.join(save_path, "metrics.csv")
+    fieldnames = [
+        "epoch", "samples", "success", "no_triggered_success",
+        "triggered_success", "ASR", "No_triggered", "Triggered",
+    ]
+    exists = os.path.exists(path)
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not exists:
+            writer.writeheader()
+        writer.writerow(metrics)
+
+
+set_seed(args.seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {device}")
 if args.target != None:
@@ -45,13 +105,24 @@ if args.det != None:
         cfg.DETECTOR.NAME = args.det
 if args.target != None:
     cfg.ATTACKER.TARGET_LABEL = args.target
+if args.epochs is not None:
+    cfg.ATTACKER.EPOCH = args.epochs
+if args.train_batch is not None:
+    cfg.ATTACKER.TRAIN_BATCH = args.train_batch
+if args.eval_batch is not None:
+    cfg.ATTACKER.EVAL_BATCH = args.eval_batch
+if args.repeat is not None:
+    cfg.ATTACKER.REPEAT = args.repeat
 
 print(f"Start Time: {time_str}_{cfg.ATTACKER.TYPE}_{cfg.DETECTOR.NAME}_{cfg.ATTACKER.TARGET_LABEL}")
 logger(cfg, args)
 
 if cfg.ATTACKER.TYPE != "TA-C":
     train_dataloader = load_coco(cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR)
-    evaluate_dataloader = load_kitti(cfg=cfg) # evaluate_dataloader = load_bdd100k(cfg=cfg)
+    if args.eval_dataset == "bdd100k":
+        evaluate_dataloader = load_bdd100k(cfg=cfg)
+    else:
+        evaluate_dataloader = load_kitti(cfg=cfg)
     model = get_det_model(device, cfg.DETECTOR.NAME)
 else:
     train_dataloader = evaluate_dataloader = load_imagenet_val(cfg.DATA.TRAIN.IMG_DIR)
@@ -99,6 +170,7 @@ elif cfg.ATTACKER.TYPE == "TA-C":
 save_path = os.path.join(args.exp_dir, f"train_{time_str}_{cfg.ATTACKER.TYPE}_{cfg.DETECTOR.NAME}_{cfg.ATTACKER.TARGET_LABEL}")
 if not os.path.exists(save_path):
     os.makedirs(save_path)
+write_run_metadata(save_path, cfg, args, time_str)
 
 if cfg.ATTACKER.TYPE == "HA":
     patch = LHawk(psize[0], psize[1], cfg.target_index, device=device, lr=cfg.ATTACKER.LR, momentum=cfg.ATTACKER.MOMENTUM,
@@ -118,7 +190,8 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
         random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
         print(f"Select {random_index.item()} mask for Eval.")
         selected_mask = torch.index_select(trigger_mask, 0, random_index)
-        eval(cfg, model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
+        metrics = eval(cfg, model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
+        append_metrics(save_path, metrics)
     patch.save(os.path.join(save_path, f"p_epoch{e}.png"))
     if cfg.ATTACKER.TYPE == "HA":
         patch2.save(os.path.join(save_path, f"p2_white_epoch{e}.png"))

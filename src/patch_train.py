@@ -83,9 +83,10 @@ def train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask,
 def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, test_loader, e):
     model.eval()
     success, success_1, success_2 = 0, 0, 0
-    set_resize = torch.cuda.FloatTensor(cfg.ATTACKER.EVAL_BATCH).uniform_(cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
-    set_rotate = torch.cuda.FloatTensor(cfg.ATTACKER.EVAL_BATCH).uniform_(-cfg.EVAL.ANGLE_EVAL,
-                                                                          cfg.EVAL.ANGLE_EVAL)
+    set_resize = torch.empty(cfg.ATTACKER.EVAL_BATCH, device=patch.device).uniform_(
+        cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
+    set_rotate = torch.empty(cfg.ATTACKER.EVAL_BATCH, device=patch.device).uniform_(
+        -cfg.EVAL.ANGLE_EVAL, cfg.EVAL.ANGLE_EVAL)
     for i, img in tqdm(enumerate(test_loader), desc=f'Testing epoch {e}', total=cfg.ATTACKER.EVAL_BATCH):
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
@@ -179,4 +180,19 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
         else:
             del imgn, imgp, gt_box, pred1, pred2
             torch.cuda.empty_cache()
-    print(f"ASR: {success / cfg.ATTACKER.EVAL_BATCH}; No_triggered: {success_1 / cfg.ATTACKER.EVAL_BATCH}; Triggered: {success_2 / cfg.ATTACKER.EVAL_BATCH}")
+    metrics = {
+        "epoch": e,
+        "samples": cfg.ATTACKER.EVAL_BATCH,
+        "success": success,
+        "no_triggered_success": success_1,
+        "triggered_success": success_2,
+        "ASR": success / cfg.ATTACKER.EVAL_BATCH,
+        "No_triggered": success_1 / cfg.ATTACKER.EVAL_BATCH,
+        "Triggered": success_2 / cfg.ATTACKER.EVAL_BATCH,
+    }
+    print(
+        f"ASR: {metrics['ASR']}; "
+        f"No_triggered: {metrics['No_triggered']}; "
+        f"Triggered: {metrics['Triggered']}"
+    )
+    return metrics

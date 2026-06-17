@@ -96,6 +96,7 @@ runs/
 results/
 outputs/
 output/
+exp/
 checkpoints/
 logs/
 wandb/

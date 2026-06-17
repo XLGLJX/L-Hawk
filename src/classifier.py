@@ -11,12 +11,15 @@ class BaseClassifier(nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
-        self.compute_conf = nn.Softmax()
+        self.compute_conf = nn.Softmax(dim=1)
         self.preprocess = load_imagenet_preprocess()
 
-    def forward(self, x, y=None, tr=True):
+    def confidence(self, x):
         logits = self.model(self.preprocess(x))
-        conf = self.compute_conf(logits)
+        return self.compute_conf(logits)
+
+    def forward(self, x, y=None, tr=True):
+        conf = self.confidence(x)
         if y is None:
             idx = conf.max(dim=1)[1]
             return idx
@@ -40,6 +43,12 @@ class EnsembleModel(nn.Module):
         self.n = len(models)
     
     def forward(self, x, y=None, tr=True):
+        if y is None:
+            conf = 0
+            for model in self.models:
+                conf += model.confidence(x)
+            return (conf / self.n).max(dim=1)[1]
+
         loss = 0
         for model in self.models:
             loss += model(x, y=y, tr=tr)

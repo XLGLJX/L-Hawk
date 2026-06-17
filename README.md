@@ -29,6 +29,36 @@ We present a simple demo: train an adversarial patch based on fixed color stripe
 First, you can initialize the parameters for different attacks in `./configs`.
 Then, run `demo.py` to generate and evaluate the patch for HA(Hiding Attack), CA(Creating Attack), TA-D(Targeted Attack Against Detectors), and TA-C(Targeted Attack Against Classifiers).
 
+Examples:
+
+```bash
+# TA-C against a single classifier target.
+python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920
+
+# CA against YOLOv5 on KITTI evaluation images.
+python demo.py --cfg configs/CA.yaml --attack_type CA --det yolov5 --target "stop sign"
+
+# Quick smoke-sized run. Use this to validate paths before full experiments.
+python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
+  --epochs 1 --train-batch 1 --eval-batch 1 --repeat 1
+```
+
+Each run writes its generated patches, `run_config.json`, and `metrics.csv` under `exp/`.
+The metrics file records `ASR`, `No_triggered`, and `Triggered` for each epoch.
+
+For a small experiment matrix, use:
+
+```bash
+python scripts/run_digital_experiments.py \
+  --attacks TA-C,CA \
+  --classifiers vgg16,res50 \
+  --detectors yolov5 \
+  --classifier-targets 920 \
+  --detector-targets "stop sign"
+```
+
+Add `--dry-run` to print the commands without executing them.
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 
