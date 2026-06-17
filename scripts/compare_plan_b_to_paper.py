@@ -23,6 +23,17 @@ def round_metric(value):
     return round(float(value), 6)
 
 
+def add_tracking_rank(group):
+    group = group.copy()
+    tracking_columns = ["experiment_name", "run_tag", "profile"]
+    rank = 0
+    for column in tracking_columns:
+        if column in group.columns:
+            rank = rank + group[column].fillna("").astype(str).ne("").astype(int)
+    group["_tracking_rank"] = rank
+    return group
+
+
 def apply_filters(df, filters):
     for item in filters or []:
         if "=" not in item:
@@ -58,6 +69,8 @@ def build_rows(df):
                 "delta_mean": "",
                 "delta_best": "",
                 "best_experiment_name": "",
+                "best_profile": "",
+                "best_run_tag": "",
                 "best_model": "",
                 "best_eval_model": "",
                 "best_target": "",
@@ -66,7 +79,13 @@ def build_rows(df):
             })
             continue
 
-        best = group.sort_values("ASR", ascending=False).iloc[0]
+        group = add_tracking_rank(group)
+        sort_columns = ["ASR", "_tracking_rank"]
+        ascending = [False, False]
+        if "time" in group.columns:
+            sort_columns.append("time")
+            ascending.append(False)
+        best = group.sort_values(sort_columns, ascending=ascending).iloc[0]
         mean_asr = round_metric(group["ASR"].mean())
         max_asr = round_metric(group["ASR"].max())
         min_asr = round_metric(group["ASR"].min())
@@ -80,6 +99,8 @@ def build_rows(df):
             "delta_mean": round_metric(mean_asr - paper_asr),
             "delta_best": round_metric(max_asr - paper_asr),
             "best_experiment_name": clean_value(best.get("experiment_name", "")),
+            "best_profile": clean_value(best.get("profile", "")),
+            "best_run_tag": clean_value(best.get("run_tag", "")),
             "best_model": clean_value(best.get("model", "")),
             "best_eval_model": clean_value(best.get("eval_model", "")),
             "best_target": clean_value(best.get("target", "")),
