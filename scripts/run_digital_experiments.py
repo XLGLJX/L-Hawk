@@ -80,6 +80,8 @@ def build_commands(args):
                 cmd.extend(["--trigger-selection", args.trigger_selection])
                 cmd.extend(["--trigger-search-metric", args.trigger_search_metric])
                 cmd.extend(["--trigger-search-batch", str(args.trigger_search_batch)])
+                if args.patch_size is not None:
+                    cmd.extend(["--patch-size", str(args.patch_size)])
                 commands.append(cmd)
     return commands
 
@@ -120,6 +122,7 @@ def main():
     parser.add_argument("--trigger-selection", choices=("random", "epoch-search"), default="random")
     parser.add_argument("--trigger-search-metric", choices=("ASR", "Triggered", "No_triggered"), default="ASR")
     parser.add_argument("--trigger-search-batch", type=int, default=8)
+    parser.add_argument("--patch-size", type=int)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

@@ -104,6 +104,15 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 9
   --trigger-search-batch 8
 ```
 
+Patch-size sweeps can be run by changing `--patch-size`, for example:
+
+```bash
+python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det res50 --target 920 \
+  --trigger-source laser \
+  --patch-size 64 \
+  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
+```
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 

@@ -74,6 +74,8 @@ parser.add_argument('--laser-k4', type=float, default=1.0e-5)
 parser.add_argument('--trigger-selection', choices=("random", "epoch-search"), default="random")
 parser.add_argument('--trigger-search-metric', choices=("ASR", "Triggered", "No_triggered"), default="ASR")
 parser.add_argument('--trigger-search-batch', type=int, default=8)
+parser.add_argument('--patch-size', type=int, default=None,
+                    help="Override the attack patch size with a square patch.")
 args = parser.parse_args()
 
 
@@ -261,6 +263,13 @@ else:
     psize = (40, 110)
     relpos = (28, 45)
 relpos3 = (132, 45)
+if args.patch_size is not None:
+    if cfg.ATTACKER.TYPE == "TA-C":
+        bgsize_TA_Cls = (args.patch_size, args.patch_size)
+    elif cfg.ATTACKER.TYPE == "HA":
+        psize = (args.patch_size, args.patch_size)
+    else:
+        bgsize = (args.patch_size, args.patch_size)
 
 # Adversarial Patch Initialization
 patch2 = LHawk(bgsize[0], bgsize[1], cfg.target_index, device, eot=cfg.ATTACKER.PATCH.EOT,
