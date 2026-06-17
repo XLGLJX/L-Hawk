@@ -43,6 +43,12 @@ parser.add_argument('--origin', type=str, default="stop sign")
 parser.add_argument('--det', type=str, default=None)
 parser.add_argument('--eval-det', type=str, default=None,
                     help="Optional separate model used only for evaluation/transfer tests.")
+parser.add_argument('--run-tag', type=str, default=None,
+                    help="Optional label appended to the output directory for experiment tracking.")
+parser.add_argument('--experiment-name', type=str, default=None,
+                    help="Optional manifest experiment name recorded in run_config.json.")
+parser.add_argument('--profile', type=str, default=None,
+                    help="Optional manifest profile recorded in run_config.json.")
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--epochs', type=int, default=None)
 parser.add_argument('--train-batch', type=int, default=None)
@@ -358,15 +364,15 @@ elif cfg.ATTACKER.TYPE == "CA" or cfg.ATTACKER.TYPE == "TA-D":
 elif cfg.ATTACKER.TYPE == "TA-C":
     nps_loss = NPS_Loss("src/printability/30values.txt", bgsize_TA_Cls).to(device)
 
-save_path = os.path.join(
-    args.exp_dir,
-    "train_{}_{}_{}_{}".format(
-        time_str,
-        slugify(cfg.ATTACKER.TYPE),
-        slugify(cfg.DETECTOR.NAME),
-        slugify(cfg.ATTACKER.TARGET_LABEL),
-    ),
-)
+run_parts = [time_str]
+if args.run_tag:
+    run_parts.append(slugify(args.run_tag))
+run_parts.extend([
+    slugify(cfg.ATTACKER.TYPE),
+    slugify(cfg.DETECTOR.NAME),
+    slugify(cfg.ATTACKER.TARGET_LABEL),
+])
+save_path = os.path.join(args.exp_dir, "train_{}".format("_".join(run_parts)))
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 write_run_metadata(save_path, cfg, args, time_str)

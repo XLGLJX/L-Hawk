@@ -41,6 +41,10 @@ def flatten_run(run_dir):
     return {
         "run_dir": str(run_dir),
         "time": config.get("time"),
+        "run_tag": args.get("run_tag"),
+        "experiment_name": args.get("experiment_name"),
+        "profile": args.get("profile"),
+        "seed": args.get("seed"),
         "attack": args.get("attack_type"),
         "model": args.get("det"),
         "eval_model": args.get("eval_det"),

@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +18,7 @@ TRIGGER_MODES = {
 
 CLI_KEYS = {
     "exp_dir": "--exp_dir",
+    "seed": "--seed",
     "eval_dataset": "--eval-dataset",
     "epochs": "--epochs",
     "train_batch": "--train-batch",
@@ -69,7 +71,21 @@ def expand_sweep(experiment):
     return [dict(zip(keys, item)) for item in itertools.product(*values)]
 
 
-def build_command(settings, model, target, eval_model=None):
+def slugify(value):
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value))
+    return value.strip("_") or "none"
+
+
+def format_run_tag(profile, experiment_name, model, target, eval_model, sweep_values):
+    parts = [profile, experiment_name, model, target]
+    if eval_model:
+        parts.extend(["eval", eval_model])
+    for key in sorted(sweep_values):
+        parts.append(f"{key}-{sweep_values[key]}")
+    return "_".join(slugify(part) for part in parts)
+
+
+def build_command(settings, model, target, profile, experiment_name, sweep_values, eval_model=None):
     cmd = [
         sys.executable,
         "demo.py",
@@ -78,6 +94,9 @@ def build_command(settings, model, target, eval_model=None):
         "--det", model,
         "--target", str(target),
         "--origin", str(settings.get("origin", "person")),
+        "--experiment-name", experiment_name,
+        "--profile", profile,
+        "--run-tag", format_run_tag(profile, experiment_name, model, target, eval_model, sweep_values),
     ]
     if eval_model:
         cmd.extend(["--eval-det", eval_model])
@@ -101,7 +120,10 @@ def build_commands(manifest, experiment_names, profile):
         for sweep_values in expand_sweep(experiment):
             settings = merge_settings(defaults, profile_settings, experiment, sweep_values)
             for model, target, eval_model in itertools.product(models, targets, eval_models):
-                commands.append((name, build_command(settings, model, target, eval_model)))
+                commands.append((
+                    name,
+                    build_command(settings, model, target, profile, name, sweep_values, eval_model),
+                ))
     return commands
 
 

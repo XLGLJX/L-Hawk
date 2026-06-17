@@ -233,6 +233,11 @@ python scripts/run_plan_b_manifest.py \
   --experiments factor_power_tac
 ```
 
+Manifest runs pass `--experiment-name`, `--profile`, `--run-tag`, and `--seed`
+to `demo.py`. These fields are saved in each run's `run_config.json`, and
+`scripts/collect_plan_b_results.py` exports them to the summary CSV for
+traceability across smoke and full experiment matrices.
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 

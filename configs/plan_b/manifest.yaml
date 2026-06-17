@@ -1,5 +1,6 @@
 defaults:
   exp_dir: exp/plan-b-manifest
+  seed: 0
   eval_dataset: coco
   epochs: 1
   train_batch: 1
