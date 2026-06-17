@@ -129,6 +129,7 @@ def append_trigger_selection(save_path, row):
     fieldnames = [
         "epoch", "selected_index", "metric", "metric_value",
         "ASR", "No_triggered", "Triggered",
+        "power_mw", "distance_m", "angle_deg", "ambient_lux",
     ]
     exists = os.path.exists(path)
     with open(path, "a", newline="", encoding="utf-8") as f:
@@ -136,6 +137,13 @@ def append_trigger_selection(save_path, row):
         if not exists:
             writer.writeheader()
         writer.writerow(row)
+
+
+def write_trigger_candidates(save_path, rows):
+    if not rows:
+        return
+    with open(os.path.join(save_path, "trigger_candidates.json"), "w", encoding="utf-8") as f:
+        json.dump(rows, f, indent=2, ensure_ascii=False)
 
 
 def select_trigger_candidate(
@@ -152,6 +160,7 @@ def select_trigger_candidate(
     save_path,
     metric,
     search_batch,
+    trigger_metadata=None,
 ):
     best_index = 0
     best_metrics = None
@@ -168,6 +177,7 @@ def select_trigger_candidate(
                 best_index = idx
                 best_metrics = metrics
                 best_value = metric_value
+    selected_meta = trigger_metadata[best_index] if trigger_metadata else {}
     append_trigger_selection(save_path, {
         "epoch": epoch,
         "selected_index": best_index,
@@ -176,6 +186,10 @@ def select_trigger_candidate(
         "ASR": best_metrics["ASR"],
         "No_triggered": best_metrics["No_triggered"],
         "Triggered": best_metrics["Triggered"],
+        "power_mw": selected_meta.get("power_mw"),
+        "distance_m": selected_meta.get("distance_m"),
+        "angle_deg": selected_meta.get("angle_deg"),
+        "ambient_lux": selected_meta.get("ambient_lux"),
     })
     print(
         f"Selected trigger {best_index} by {metric}={best_value} "
@@ -259,6 +273,7 @@ patch2.rotate_mask = resize(patch2.rotate_mask)
 
 folder_path = "src/color_stripe/trigger"  # Replace with your actual folder path
 is_detector_attack = cfg.ATTACKER.TYPE != "TA-C"
+trigger_metadata = []
 if args.trigger_source == "fixed":
     if is_detector_attack:
         trigger_mask = generate_trigger_tensor(folder_path)
@@ -271,6 +286,21 @@ else:
         angles=parse_float_spec(args.laser_angle),
         lights=parse_float_spec(args.ambient_light),
     )
+    trigger_metadata = [
+        {
+            "index": idx,
+            "power_mw": params.power_mw,
+            "distance_m": params.distance_m,
+            "angle_deg": params.angle_deg,
+            "ambient_lux": params.ambient_lux,
+            "model": args.laser_model,
+            "color": args.laser_color,
+            "trigger_height": args.trigger_height or 50,
+            "trigger_width": args.trigger_width,
+            "trigger_position": args.trigger_position,
+        }
+        for idx, params in enumerate(trigger_params)
+    ]
     trigger_mask = generate_laser_trigger_tensor(
         params_grid=trigger_params,
         isdetector=is_detector_attack,
@@ -312,6 +342,7 @@ save_path = os.path.join(
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 write_run_metadata(save_path, cfg, args, time_str)
+write_trigger_candidates(save_path, trigger_metadata)
 
 if cfg.ATTACKER.TYPE == "HA":
     patch = LHawk(psize[0], psize[1], cfg.target_index, device=device, lr=cfg.ATTACKER.LR, momentum=cfg.ATTACKER.MOMENTUM,
@@ -330,7 +361,7 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
         train_trigger_mask = select_trigger_candidate(
             cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load,
             evaluate_dataloader, e, save_path, args.trigger_search_metric,
-            args.trigger_search_batch)
+            args.trigger_search_batch, trigger_metadata=trigger_metadata)
     else:
         train_trigger_mask = trigger_mask
     train(cfg, model, relpos, relpos3, patch, patch2, train_trigger_mask, content_loss, tv_loss, nps_loss, quick_load, train_dataloader, device, e)
