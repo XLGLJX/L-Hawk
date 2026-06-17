@@ -1,4 +1,5 @@
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,7 +9,27 @@ def split_csv(value):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def common_demo_args(args):
+def slugify(value):
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value))
+    return value.strip("_") or "none"
+
+
+def tracking_args(args, sweep_value):
+    experiment_name = args.experiment_name or f"manual_sweep_{args.sweep}"
+    tag_parts = [args.run_tag_prefix, args.profile, experiment_name, args.model, args.target]
+    if args.eval_model:
+        tag_parts.extend(["eval", args.eval_model])
+    tag_parts.append(f"{args.sweep}-{sweep_value}")
+    run_tag = "_".join(slugify(part) for part in tag_parts if part)
+    return [
+        "--seed", str(args.seed),
+        "--experiment-name", experiment_name,
+        "--profile", args.profile,
+        "--run-tag", run_tag,
+    ]
+
+
+def common_demo_args(args, sweep_value):
     cmd = [
         sys.executable,
         "demo.py",
@@ -23,6 +44,7 @@ def common_demo_args(args):
         "--train-batch", str(args.train_batch),
         "--eval-batch", str(args.eval_batch),
         "--repeat", str(args.repeat),
+        *tracking_args(args, sweep_value),
         "--trigger-source", "laser",
         "--laser-model", args.laser_model,
         "--laser-color", args.laser_color,
@@ -47,40 +69,40 @@ def build_commands(args):
     commands = []
     if args.sweep == "power":
         for power in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, power)
             cmd.extend(["--laser-power", power])
             commands.append(cmd)
     elif args.sweep == "color":
         for color in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, color)
             cmd.extend(["--laser-color", color, "--laser-power", args.laser_power])
             commands.append(cmd)
     elif args.sweep == "position":
         for position in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, position)
             cmd.extend(["--laser-power", args.laser_power, "--trigger-position", position])
             if args.trigger_width is not None:
                 cmd.extend(["--trigger-width", str(args.trigger_width)])
             commands.append(cmd)
     elif args.sweep == "width":
         for width in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, width)
             cmd.extend(["--laser-power", args.laser_power, "--trigger-width", width])
             cmd.extend(["--trigger-position", str(args.trigger_position)])
             commands.append(cmd)
     elif args.sweep == "patch-size":
         for patch_size in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, patch_size)
             cmd.extend(["--laser-power", args.laser_power, "--patch-size", patch_size])
             commands.append(cmd)
     elif args.sweep == "patch-left":
         for patch_left in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, patch_left)
             cmd.extend(["--laser-power", args.laser_power, "--patch-left", patch_left])
             commands.append(cmd)
     elif args.sweep == "patch-top":
         for patch_top in split_csv(args.values):
-            cmd = common_demo_args(args)
+            cmd = common_demo_args(args, patch_top)
             cmd.extend(["--laser-power", args.laser_power, "--patch-top", patch_top])
             commands.append(cmd)
     else:
@@ -101,6 +123,12 @@ def main():
     parser.add_argument("--origin", default="person")
     parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="coco")
     parser.add_argument("--exp-dir", default="exp/plan-b")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--profile", default="manual")
+    parser.add_argument("--experiment-name",
+                        help="Experiment name recorded in run_config.json. Defaults to manual_sweep_<sweep>.")
+    parser.add_argument("--run-tag-prefix",
+                        help="Optional prefix added to generated run tags.")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--train-batch", type=int, default=50)
     parser.add_argument("--eval-batch", type=int, default=800)

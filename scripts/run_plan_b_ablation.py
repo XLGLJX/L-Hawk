@@ -1,4 +1,5 @@
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +17,27 @@ def split_csv(value):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def build_base_command(args):
+def slugify(value):
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value))
+    return value.strip("_") or "none"
+
+
+def tracking_args(args, mode):
+    experiment_name = args.experiment_name or "manual_ablation"
+    tag_parts = [args.run_tag_prefix, args.profile, experiment_name, args.model, args.target]
+    if args.eval_model:
+        tag_parts.extend(["eval", args.eval_model])
+    tag_parts.append(mode)
+    run_tag = "_".join(slugify(part) for part in tag_parts if part)
+    return [
+        "--seed", str(args.seed),
+        "--experiment-name", experiment_name,
+        "--profile", args.profile,
+        "--run-tag", run_tag,
+    ]
+
+
+def build_base_command(args, mode):
     return [
         sys.executable,
         "demo.py",
@@ -31,6 +52,7 @@ def build_base_command(args):
         "--train-batch", str(args.train_batch),
         "--eval-batch", str(args.eval_batch),
         "--repeat", str(args.repeat),
+        *tracking_args(args, mode),
         "--laser-model", args.laser_model,
         "--laser-color", args.laser_color,
         "--laser-power", args.laser_power,
@@ -48,7 +70,7 @@ def build_commands(args):
     for mode in split_csv(args.modes):
         if mode not in MODES:
             raise ValueError(f"Unsupported ablation mode: {mode}")
-        cmd = build_base_command(args)
+        cmd = build_base_command(args, mode)
         cmd.extend(MODES[mode])
         if args.eval_model:
             cmd.extend(["--eval-det", args.eval_model])
@@ -69,6 +91,12 @@ def main():
     parser.add_argument("--origin", default="person")
     parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="coco")
     parser.add_argument("--exp-dir", default="exp/plan-b-ablation")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--profile", default="manual")
+    parser.add_argument("--experiment-name",
+                        help="Experiment name recorded in run_config.json. Defaults to manual_ablation.")
+    parser.add_argument("--run-tag-prefix",
+                        help="Optional prefix added to generated run tags.")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--train-batch", type=int, default=50)
     parser.add_argument("--eval-batch", type=int, default=800)

@@ -162,6 +162,10 @@ python scripts/collect_plan_b_results.py \
   --output exp/plan-b/summary.csv
 ```
 
+The sweep helper passes `--seed`, `--experiment-name`, `--profile`, and a
+generated `--run-tag` to `demo.py`, so manually launched sweeps are traceable in
+the collected summary CSV as well.
+
 Plot collected results:
 
 ```bash
@@ -214,6 +218,9 @@ python scripts/run_plan_b_ablation.py \
   --model res50 \
   --target 920
 ```
+
+Each ablation mode receives a distinct run tag and records the same traceability
+fields as the manifest runner.
 
 Plan-B manifest runner expands predefined paper-aligned experiment matrices:
 
