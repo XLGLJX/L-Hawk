@@ -72,6 +72,47 @@ experiments:
     sweep:
       laser_power: ["10", "20", "30", "40", "50", "60", "70"]
 
+  factor_power_patch_left_tac:
+    description: Trigger power and patch lateral-position heatmap for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      laser_power: ["10", "20", "30", "40", "50", "60", "70"]
+      patch_left: ["0", "18", "35", "53", "71", "89", "106", "124"]
+
+  factor_power_patch_left_ca:
+    description: Trigger power and patch lateral-position heatmap for CA.
+    cfg: configs/CA.yaml
+    attack: CA
+    models: [yolov5]
+    targets: ["stop sign"]
+    sweep:
+      laser_power: ["10", "20", "30", "40", "50", "60", "70"]
+      patch_left: ["0", "55", "110", "165", "220", "275", "330", "385"]
+
+  factor_power_distance_angle_tac:
+    description: Laser power, distance, and incidence-angle grid for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      laser_power: ["30", "50", "70"]
+      laser_distance: ["10", "15", "20", "25", "30"]
+      laser_angle: ["0", "15", "30", "45"]
+
+  factor_power_ambient_tac:
+    description: Laser power and ambient-light grid for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      laser_power: ["10", "30", "50"]
+      ambient_light: ["1238", "719", "461", "198", "0"]
+
   factor_color_ca:
     description: Trigger color sweep for CA.
     cfg: configs/CA.yaml
@@ -88,6 +129,16 @@ experiments:
     models: [res50]
     targets: ["920"]
     sweep:
+      trigger_width: ["56", "112", "168", "224"]
+
+  factor_trigger_position_width_tac:
+    description: Trigger position and width heatmap for TA-C.
+    cfg: configs/TA-C.yaml
+    attack: TA-C
+    models: [res50]
+    targets: ["920"]
+    sweep:
+      trigger_position: ["0.0", "0.125", "0.25", "0.375", "0.5", "0.625", "0.75"]
       trigger_width: ["56", "112", "168", "224"]
 
   factor_patch_size_tac:

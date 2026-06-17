@@ -58,6 +58,7 @@ def main():
     coerce_numeric(df, [
         "ASR", "No_triggered", "Triggered",
         "laser_power", "selected_power_mw",
+        "laser_distance", "laser_angle", "ambient_light",
         "trigger_position", "trigger_width",
         "patch_size", "patch_top", "patch_left",
     ])

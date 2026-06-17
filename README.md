@@ -243,12 +243,37 @@ python scripts/run_plan_b_manifest.py \
 python scripts/run_plan_b_manifest.py \
   --profile full \
   --experiments factor_power_tac
+
+# Paper-aligned heatmap grids are available as explicit experiments.
+python scripts/run_plan_b_manifest.py \
+  --profile full \
+  --experiments factor_power_patch_left_tac,factor_trigger_position_width_tac
 ```
 
 Manifest runs pass `--experiment-name`, `--profile`, `--run-tag`, and `--seed`
 to `demo.py`. These fields are saved in each run's `run_config.json`, and
 `scripts/collect_plan_b_results.py` exports them to the summary CSV for
 traceability across smoke and full experiment matrices.
+
+Example heatmap plots for manifest outputs:
+
+```bash
+python scripts/plot_plan_b_results.py \
+  --summary exp/plan-b-manifest/summary.csv \
+  --plot heatmap \
+  --x patch_left \
+  --heatmap-y laser_power \
+  --y ASR \
+  --output exp/plan-b-manifest/power_patch_left_asr.png
+
+python scripts/plot_plan_b_results.py \
+  --summary exp/plan-b-manifest/summary.csv \
+  --plot heatmap \
+  --x trigger_position \
+  --heatmap-y trigger_width \
+  --y ASR \
+  --output exp/plan-b-manifest/trigger_position_width_asr.png
+```
 
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
