@@ -113,6 +113,38 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det res50 --target 9
   --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
 ```
 
+Plan-B sweep helper:
+
+```bash
+# Laser power sweep: 10 mW to 70 mW.
+python scripts/run_plan_b_sweeps.py \
+  --sweep power \
+  --values 10,20,30,40,50,60,70 \
+  --cfg configs/TA-C.yaml \
+  --attack TA-C \
+  --model res50 \
+  --target 920
+
+# Trigger color sweep.
+python scripts/run_plan_b_sweeps.py \
+  --sweep color \
+  --values green,red \
+  --cfg configs/CA.yaml \
+  --attack CA \
+  --model yolov5 \
+  --target "stop sign" \
+  --eval-dataset coco
+
+# Patch-size sweep.
+python scripts/run_plan_b_sweeps.py \
+  --sweep patch-size \
+  --values 32,48,64,80 \
+  --cfg configs/TA-C.yaml \
+  --attack TA-C \
+  --model res50 \
+  --target 920
+```
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 
