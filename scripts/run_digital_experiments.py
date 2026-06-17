@@ -127,7 +127,7 @@ def main():
     parser.add_argument("--trigger-width", type=int)
     parser.add_argument("--trigger-position", type=float, default=0.5)
     parser.add_argument("--trigger-noise-std", type=float, default=0.0)
-    parser.add_argument("--trigger-selection", choices=("random", "epoch-search"), default="random")
+    parser.add_argument("--trigger-selection", choices=("random", "epoch-search", "async-joint"), default="random")
     parser.add_argument("--trigger-search-metric", choices=("ASR", "Triggered", "No_triggered"), default="ASR")
     parser.add_argument("--trigger-search-batch", type=int, default=8)
     parser.add_argument("--patch-size", type=int)

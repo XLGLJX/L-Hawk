@@ -10,6 +10,7 @@ MODES = {
     "fixed": ["--trigger-source", "fixed", "--trigger-selection", "random"],
     "laser-random": ["--trigger-source", "laser", "--trigger-selection", "random"],
     "laser-epoch-search": ["--trigger-source", "laser", "--trigger-selection", "epoch-search"],
+    "laser-async-joint": ["--trigger-source", "laser", "--trigger-selection", "async-joint"],
 }
 
 
@@ -82,7 +83,7 @@ def build_commands(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Run plan-B ablation experiments.")
-    parser.add_argument("--modes", default="none,fixed,laser-random,laser-epoch-search")
+    parser.add_argument("--modes", default="none,fixed,laser-random,laser-epoch-search,laser-async-joint")
     parser.add_argument("--cfg", default="configs/TA-C.yaml")
     parser.add_argument("--attack", default="TA-C")
     parser.add_argument("--model", default="vgg16")

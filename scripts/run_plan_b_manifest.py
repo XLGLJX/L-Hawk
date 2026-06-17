@@ -13,6 +13,7 @@ TRIGGER_MODES = {
     "fixed": {"trigger_source": "fixed", "trigger_selection": "random"},
     "laser-random": {"trigger_source": "laser", "trigger_selection": "random"},
     "laser-epoch-search": {"trigger_source": "laser", "trigger_selection": "epoch-search"},
+    "laser-async-joint": {"trigger_source": "laser", "trigger_selection": "async-joint"},
 }
 
 
@@ -37,6 +38,11 @@ CLI_KEYS = {
     "trigger_selection": "--trigger-selection",
     "trigger_search_metric": "--trigger-search-metric",
     "trigger_search_batch": "--trigger-search-batch",
+    "async_power_radius": "--async-power-radius",
+    "async_distance_radius": "--async-distance-radius",
+    "async_angle_radius": "--async-angle-radius",
+    "async_light_radius": "--async-light-radius",
+    "async_shrink": "--async-shrink",
     "patch_size": "--patch-size",
     "patch_top": "--patch-top",
     "patch_left": "--patch-left",

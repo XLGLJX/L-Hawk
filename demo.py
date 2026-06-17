@@ -79,9 +79,27 @@ parser.add_argument('--laser-k1', type=float, default=12.0)
 parser.add_argument('--laser-k2', type=float, default=2.0e-5)
 parser.add_argument('--laser-k3', type=float, default=4.0)
 parser.add_argument('--laser-k4', type=float, default=1.0e-5)
-parser.add_argument('--trigger-selection', choices=("random", "epoch-search"), default="random")
+parser.add_argument('--trigger-selection', choices=("random", "epoch-search", "async-joint"), default="random")
 parser.add_argument('--trigger-search-metric', choices=("ASR", "Triggered", "No_triggered"), default="ASR")
 parser.add_argument('--trigger-search-batch', type=int, default=8)
+parser.add_argument('--async-power-radius', type=float, default=10.0,
+                    help="Power search radius around the best trigger for async-joint.")
+parser.add_argument('--async-distance-radius', type=float, default=5.0,
+                    help="Distance search radius around the best trigger for async-joint.")
+parser.add_argument('--async-angle-radius', type=float, default=5.0,
+                    help="Incidence-angle search radius around the best trigger for async-joint.")
+parser.add_argument('--async-light-radius', type=float, default=200.0,
+                    help="Ambient-light search radius around the best trigger for async-joint.")
+parser.add_argument('--async-shrink', type=float, default=0.75,
+                    help="Radius decay applied after each async-joint epoch.")
+parser.add_argument('--async-min-power', type=float, default=1.0)
+parser.add_argument('--async-max-power', type=float, default=100.0)
+parser.add_argument('--async-min-distance', type=float, default=1.0)
+parser.add_argument('--async-max-distance', type=float, default=80.0)
+parser.add_argument('--async-min-angle', type=float, default=-60.0)
+parser.add_argument('--async-max-angle', type=float, default=60.0)
+parser.add_argument('--async-min-light', type=float, default=0.0)
+parser.add_argument('--async-max-light', type=float, default=5000.0)
 parser.add_argument('--patch-size', type=int, default=None,
                     help="Override the attack patch size with a square patch.")
 parser.add_argument('--patch-top', type=int, default=None,
@@ -141,7 +159,7 @@ def append_metrics(save_path, metrics):
 def append_trigger_selection(save_path, row):
     path = os.path.join(save_path, "trigger_selection.csv")
     fieldnames = [
-        "epoch", "selected_index", "metric", "metric_value",
+        "epoch", "phase", "selected_index", "metric", "metric_value",
         "ASR", "No_triggered", "Triggered",
         "power_mw", "distance_m", "angle_deg", "ambient_lux",
     ]
@@ -160,6 +178,76 @@ def write_trigger_candidates(save_path, rows):
         json.dump(rows, f, indent=2, ensure_ascii=False)
 
 
+def _bounded_triplet(center, radius, lower, upper):
+    center = float(center)
+    radius = float(radius)
+    values = [center] if radius <= 0 else [center - radius, center, center + radius]
+    clipped = []
+    for value in values:
+        value = min(max(value, lower), upper)
+        if not any(abs(value - old) < 1e-9 for old in clipped):
+            clipped.append(value)
+    return clipped
+
+
+def make_trigger_metadata(trigger_params, args, async_epoch=None, async_radius_scale=None):
+    rows = []
+    for idx, params in enumerate(trigger_params):
+        row = {
+            "index": idx,
+            "power_mw": params.power_mw,
+            "distance_m": params.distance_m,
+            "angle_deg": params.angle_deg,
+            "ambient_lux": params.ambient_lux,
+            "model": args.laser_model,
+            "color": args.laser_color,
+            "trigger_height": args.trigger_height or 50,
+            "trigger_width": args.trigger_width,
+            "trigger_position": args.trigger_position,
+        }
+        if async_epoch is not None:
+            row["async_epoch"] = async_epoch
+            row["async_radius_scale"] = async_radius_scale
+        rows.append(row)
+    return rows
+
+
+def generate_laser_space(trigger_params, args, is_detector_attack, device):
+    return generate_laser_trigger_tensor(
+        params_grid=trigger_params,
+        isdetector=is_detector_attack,
+        model=args.laser_model,
+        color=args.laser_color,
+        trigger_height=args.trigger_height or 50,
+        trigger_width=args.trigger_width,
+        position=args.trigger_position,
+        calibration=LaserCalibration(args.laser_k1, args.laser_k2, args.laser_k3, args.laser_k4),
+        noise_std=args.trigger_noise_std,
+        device=str(device),
+    )
+
+
+def build_async_laser_space(best_meta, args, is_detector_attack, device, next_epoch):
+    radius_scale = args.async_shrink ** max(next_epoch - 1, 0)
+    powers = _bounded_triplet(
+        best_meta["power_mw"], args.async_power_radius * radius_scale,
+        args.async_min_power, args.async_max_power)
+    distances = _bounded_triplet(
+        best_meta["distance_m"], args.async_distance_radius * radius_scale,
+        args.async_min_distance, args.async_max_distance)
+    angles = _bounded_triplet(
+        best_meta["angle_deg"], args.async_angle_radius * radius_scale,
+        args.async_min_angle, args.async_max_angle)
+    lights = _bounded_triplet(
+        best_meta["ambient_lux"], args.async_light_radius * radius_scale,
+        args.async_min_light, args.async_max_light)
+    trigger_params = build_laser_param_grid(powers, distances, angles, lights)
+    trigger_metadata = make_trigger_metadata(
+        trigger_params, args, async_epoch=next_epoch, async_radius_scale=radius_scale)
+    trigger_mask = generate_laser_space(trigger_params, args, is_detector_attack, device)
+    return trigger_mask, trigger_metadata
+
+
 def select_trigger_candidate(
     cfg,
     model,
@@ -175,6 +263,8 @@ def select_trigger_candidate(
     metric,
     search_batch,
     trigger_metadata=None,
+    phase="epoch_search",
+    return_selection=False,
 ):
     best_index = 0
     best_metrics = None
@@ -194,6 +284,7 @@ def select_trigger_candidate(
     selected_meta = trigger_metadata[best_index] if trigger_metadata else {}
     append_trigger_selection(save_path, {
         "epoch": epoch,
+        "phase": phase,
         "selected_index": best_index,
         "metric": metric,
         "metric_value": best_value,
@@ -209,8 +300,11 @@ def select_trigger_candidate(
         f"Selected trigger {best_index} by {metric}={best_value} "
         f"(ASR={best_metrics['ASR']}, Triggered={best_metrics['Triggered']})"
     )
-    return torch.index_select(
+    selected_mask = torch.index_select(
         trigger_mask, 0, torch.tensor([best_index], device=trigger_mask.device))
+    if return_selection:
+        return selected_mask, selected_meta, best_metrics
+    return selected_mask
 
 
 def slugify(value):
@@ -230,6 +324,8 @@ if args.target != None:
         args.target = int(args.target)
     except ValueError:
         pass
+if args.trigger_selection == "async-joint" and args.trigger_source != "laser":
+    sys.exit("--trigger-selection async-joint requires --trigger-source laser")
 cfg = ConfigParser(args, time_str)
 if args.attack_type != None:
     cfg.ATTACKER.TYPE = args.attack_type
@@ -320,33 +416,8 @@ else:
         angles=parse_float_spec(args.laser_angle),
         lights=parse_float_spec(args.ambient_light),
     )
-    trigger_metadata = [
-        {
-            "index": idx,
-            "power_mw": params.power_mw,
-            "distance_m": params.distance_m,
-            "angle_deg": params.angle_deg,
-            "ambient_lux": params.ambient_lux,
-            "model": args.laser_model,
-            "color": args.laser_color,
-            "trigger_height": args.trigger_height or 50,
-            "trigger_width": args.trigger_width,
-            "trigger_position": args.trigger_position,
-        }
-        for idx, params in enumerate(trigger_params)
-    ]
-    trigger_mask = generate_laser_trigger_tensor(
-        params_grid=trigger_params,
-        isdetector=is_detector_attack,
-        model=args.laser_model,
-        color=args.laser_color,
-        trigger_height=args.trigger_height or 50,
-        trigger_width=args.trigger_width,
-        position=args.trigger_position,
-        calibration=LaserCalibration(args.laser_k1, args.laser_k2, args.laser_k3, args.laser_k4),
-        noise_std=args.trigger_noise_std,
-        device=str(device),
-    )
+    trigger_metadata = make_trigger_metadata(trigger_params, args)
+    trigger_mask = generate_laser_space(trigger_params, args, is_detector_attack, device)
 
 # Cal Content Loss through VGG19 Network proposed by TPatch
 if args.content_pretrained:
@@ -396,11 +467,26 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
             cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load,
             evaluate_dataloader, e, save_path, args.trigger_search_metric,
             args.trigger_search_batch, trigger_metadata=trigger_metadata)
+    elif args.trigger_selection == "async-joint":
+        train_trigger_mask = trigger_mask
     else:
         train_trigger_mask = trigger_mask
     train(cfg, model, relpos, relpos3, patch, patch2, train_trigger_mask, content_loss, tv_loss, nps_loss, quick_load, train_dataloader, device, e)
     with torch.no_grad():
-        if train_trigger_mask.size(0) == 1:
+        if args.trigger_selection == "async-joint":
+            selected_mask, selected_meta, selected_metrics = select_trigger_candidate(
+                cfg, eval_model, relpos, relpos3, patch, patch2, trigger_mask, quick_load,
+                evaluate_dataloader, e, save_path, args.trigger_search_metric,
+                args.trigger_search_batch, trigger_metadata=trigger_metadata,
+                phase="trigger_step", return_selection=True)
+            print(
+                "Async-joint trigger step selected "
+                f"p={selected_meta.get('power_mw')}mW, "
+                f"d={selected_meta.get('distance_m')}m, "
+                f"theta={selected_meta.get('angle_deg')}deg, "
+                f"l={selected_meta.get('ambient_lux')}Lux."
+            )
+        elif train_trigger_mask.size(0) == 1:
             selected_mask = train_trigger_mask
             print("Use selected trigger mask for Eval.")
         else:
@@ -409,6 +495,10 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
             selected_mask = torch.index_select(trigger_mask, 0, random_index)
         metrics = eval(cfg, eval_model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
         append_metrics(save_path, metrics)
+        if args.trigger_selection == "async-joint" and e < cfg.ATTACKER.EPOCH:
+            trigger_mask, trigger_metadata = build_async_laser_space(
+                selected_meta, args, is_detector_attack, device, next_epoch=e + 1)
+            write_trigger_candidates(save_path, trigger_metadata)
     patch.save(os.path.join(save_path, f"p_epoch{e}.png"))
     if cfg.ATTACKER.TYPE == "HA":
         patch2.save(os.path.join(save_path, f"p2_white_epoch{e}.png"))

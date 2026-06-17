@@ -91,17 +91,25 @@ For red-trigger experiments, use `--laser-color red`. For incidence-shape
 experiments, change `--laser-model` to `sigmoid` or `gaussian`.
 
 To approximate the paper's asynchronous trigger/patch optimization loop, use
-`--trigger-selection epoch-search`. At the beginning of each epoch, the runner
-evaluates the current patch against the generated trigger candidates and trains
-that epoch with the best candidate according to `--trigger-search-metric`.
+`--trigger-selection async-joint`. Each epoch trains the patch against the
+current trigger space, selects the best trigger parameters with
+`--trigger-search-metric`, and rebuilds the next trigger space around that
+selection with shrinking search radii. The older `epoch-search` mode only
+chooses one candidate trigger before patch training and does not update the
+trigger parameter distribution.
 
 ```bash
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
   --trigger-source laser \
   --laser-power 10:70:10 \
-  --trigger-selection epoch-search \
+  --trigger-selection async-joint \
   --trigger-search-metric ASR \
-  --trigger-search-batch 8
+  --trigger-search-batch 8 \
+  --async-power-radius 10 \
+  --async-distance-radius 5 \
+  --async-angle-radius 5 \
+  --async-light-radius 200 \
+  --async-shrink 0.75
 ```
 
 Patch-size sweeps can be run by changing `--patch-size`, for example:
@@ -221,11 +229,11 @@ python demo.py --cfg configs/CA.yaml --attack_type CA \
   --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
 ```
 
-Plan-B ablations compare trigger sources and the epoch trigger search:
+Plan-B ablations compare trigger sources, epoch trigger search, and async-joint:
 
 ```bash
 python scripts/run_plan_b_ablation.py \
-  --modes none,fixed,laser-random,laser-epoch-search \
+  --modes none,fixed,laser-random,laser-epoch-search,laser-async-joint \
   --cfg configs/TA-C.yaml \
   --attack TA-C \
   --model res50 \

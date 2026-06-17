@@ -17,6 +17,11 @@ defaults:
   trigger_selection: epoch-search
   trigger_search_metric: ASR
   trigger_search_batch: 1
+  async_power_radius: 10
+  async_distance_radius: 5
+  async_angle_radius: 5
+  async_light_radius: 200
+  async_shrink: 0.75
 
 profiles:
   smoke:
@@ -167,10 +172,10 @@ experiments:
     targets: ["stop sign"]
 
   ablation_tac:
-    description: TA-C ablation of trigger source and epoch trigger search.
+    description: TA-C ablation of trigger source, epoch trigger search, and async joint optimization.
     cfg: configs/TA-C.yaml
     attack: TA-C
     models: [res50]
     targets: ["920"]
     sweep:
-      trigger_mode: [none, fixed, laser-random, laser-epoch-search]
+      trigger_mode: [none, fixed, laser-random, laser-epoch-search, laser-async-joint]
