@@ -65,6 +65,31 @@ python scripts/run_digital_experiments.py \
 
 Add `--dry-run` to print the commands without executing them.
 
+### Parameterized Laser Trigger
+
+The default trigger source is the captured fixed color-stripe images under
+`src/color_stripe/trigger`. To run the approximate parameterized trigger model
+used for the plan-B digital reproduction work, set `--trigger-source laser`.
+This implements a configurable approximation of the paper's `S(p,d,theta,l)`
+trigger generation function with linear, sigmoid, and Gaussian stripe profiles.
+The calibration constants are exposed as CLI parameters because the paper does
+not publish sensor-specific `k1..k4` values.
+
+```bash
+python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
+  --trigger-source laser \
+  --laser-model linear \
+  --laser-color green \
+  --laser-power 10:70:10 \
+  --laser-distance 30 \
+  --laser-angle 18 \
+  --ambient-light 1000 \
+  --trigger-height 50
+```
+
+For red-trigger experiments, use `--laser-color red`. For incidence-shape
+experiments, change `--laser-model` to `sigmoid` or `gaussian`.
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 

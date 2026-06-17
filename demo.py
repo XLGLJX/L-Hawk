@@ -16,6 +16,12 @@ from src.train_eval import *
 from src.kitti_bdd100k import *
 from src.Lhawk import *
 from src.color_stripe.trigger_generation import generate_trigger_tensor
+from src.color_stripe.laser_trigger import (
+    LaserCalibration,
+    build_laser_param_grid,
+    generate_laser_trigger_tensor,
+    parse_float_spec,
+)
 from utils.parser import ConfigParser, logger
 from src.patch_train import train, eval
 from src.classifier import *
@@ -43,6 +49,28 @@ parser.add_argument('--repeat', type=int, default=None)
 parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k", "coco"), default="kitti")
 parser.add_argument('--content-pretrained', action="store_true",
                     help='Use torchvision pretrained VGG19 for content loss; may require cached/downloaded weights.')
+parser.add_argument('--trigger-source', choices=("fixed", "laser"), default="fixed")
+parser.add_argument('--laser-model', choices=("linear", "sigmoid", "gaussian"), default="linear")
+parser.add_argument('--laser-color', choices=("green", "red", "white"), default="green")
+parser.add_argument('--laser-power', default="29",
+                    help="Laser power grid in mW. Supports '29', '10,30,70', or '10:70:10'.")
+parser.add_argument('--laser-distance', default="30",
+                    help="Attack distance grid in meters.")
+parser.add_argument('--laser-angle', default="18",
+                    help="Incidence angle grid in degrees.")
+parser.add_argument('--ambient-light', default="1000",
+                    help="Ambient light grid in Lux.")
+parser.add_argument('--trigger-height', type=int, default=None,
+                    help="Synthetic trigger stripe height. Defaults to 50 for laser triggers.")
+parser.add_argument('--trigger-width', type=int, default=None,
+                    help="Synthetic trigger stripe width. Defaults to the whole image width.")
+parser.add_argument('--trigger-position', type=float, default=0.5,
+                    help="Vertical stripe position in [0,1], where 0 is top and 1 is bottom.")
+parser.add_argument('--trigger-noise-std', type=float, default=0.0)
+parser.add_argument('--laser-k1', type=float, default=12.0)
+parser.add_argument('--laser-k2', type=float, default=2.0e-5)
+parser.add_argument('--laser-k3', type=float, default=4.0)
+parser.add_argument('--laser-k4', type=float, default=1.0e-5)
 args = parser.parse_args()
 
 
@@ -166,10 +194,31 @@ patch2.load_mask("assets/stop_sign_mask.png")
 patch2.rotate_mask = resize(patch2.rotate_mask)
 
 folder_path = "src/color_stripe/trigger"  # Replace with your actual folder path
-if cfg.ATTACKER.TYPE != "TA-C":
-    trigger_mask = generate_trigger_tensor(folder_path)
+is_detector_attack = cfg.ATTACKER.TYPE != "TA-C"
+if args.trigger_source == "fixed":
+    if is_detector_attack:
+        trigger_mask = generate_trigger_tensor(folder_path)
+    else:
+        trigger_mask = generate_trigger_tensor(folder_path, isdetector=False)
 else:
-    trigger_mask = generate_trigger_tensor(folder_path, isdetector=False)
+    trigger_params = build_laser_param_grid(
+        powers=parse_float_spec(args.laser_power),
+        distances=parse_float_spec(args.laser_distance),
+        angles=parse_float_spec(args.laser_angle),
+        lights=parse_float_spec(args.ambient_light),
+    )
+    trigger_mask = generate_laser_trigger_tensor(
+        params_grid=trigger_params,
+        isdetector=is_detector_attack,
+        model=args.laser_model,
+        color=args.laser_color,
+        trigger_height=args.trigger_height or 50,
+        trigger_width=args.trigger_width,
+        position=args.trigger_position,
+        calibration=LaserCalibration(args.laser_k1, args.laser_k2, args.laser_k3, args.laser_k4),
+        noise_std=args.trigger_noise_std,
+        device=str(device),
+    )
 
 # Cal Content Loss through VGG19 Network proposed by TPatch
 if args.content_pretrained:

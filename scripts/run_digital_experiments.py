@@ -60,6 +60,23 @@ def build_commands(args):
                     cmd.extend(["--eval-batch", str(args.eval_batch)])
                 if args.repeat is not None:
                     cmd.extend(["--repeat", str(args.repeat)])
+                if args.trigger_source:
+                    cmd.extend(["--trigger-source", args.trigger_source])
+                if args.laser_model:
+                    cmd.extend(["--laser-model", args.laser_model])
+                if args.laser_color:
+                    cmd.extend(["--laser-color", args.laser_color])
+                cmd.extend(["--laser-power", args.laser_power])
+                cmd.extend(["--laser-distance", args.laser_distance])
+                cmd.extend(["--laser-angle", args.laser_angle])
+                cmd.extend(["--ambient-light", args.ambient_light])
+                if args.trigger_height is not None:
+                    cmd.extend(["--trigger-height", str(args.trigger_height)])
+                if args.trigger_width is not None:
+                    cmd.extend(["--trigger-width", str(args.trigger_width)])
+                cmd.extend(["--trigger-position", str(args.trigger_position)])
+                if args.trigger_noise_std:
+                    cmd.extend(["--trigger-noise-std", str(args.trigger_noise_std)])
                 commands.append(cmd)
     return commands
 
@@ -86,6 +103,17 @@ def main():
     parser.add_argument("--eval-batch", type=int)
     parser.add_argument("--repeat", type=int)
     parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="kitti")
+    parser.add_argument("--trigger-source", choices=("fixed", "laser"), default="fixed")
+    parser.add_argument("--laser-model", choices=("linear", "sigmoid", "gaussian"), default="linear")
+    parser.add_argument("--laser-color", choices=("green", "red", "white"), default="green")
+    parser.add_argument("--laser-power", default="29")
+    parser.add_argument("--laser-distance", default="30")
+    parser.add_argument("--laser-angle", default="18")
+    parser.add_argument("--ambient-light", default="1000")
+    parser.add_argument("--trigger-height", type=int)
+    parser.add_argument("--trigger-width", type=int)
+    parser.add_argument("--trigger-position", type=float, default=0.5)
+    parser.add_argument("--trigger-noise-std", type=float, default=0.0)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
