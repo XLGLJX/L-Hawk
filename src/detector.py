@@ -508,12 +508,12 @@ class FasterRCNN(nn.Module):
 
 
 def get_det_model(device, model_type, test_mode=False):
+    del test_mode
     if model_type == "faster_rcnn":
-        return FasterRCNN(device, test_mode)
+        return FasterRCNN(device)
     elif model_type == "yolov3":
-        return YOLOv3(device, test_mode)
+        return YOLOv3(device)
     elif model_type == "yolov5":
-        return YOLOv5(device, test_mode)
+        return YOLOv5(device)
     else:
         raise NotImplementedError
-

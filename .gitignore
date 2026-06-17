@@ -1,0 +1,135 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Python packaging and build outputs
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+!.env.example
+
+# Test, lint, and type-check caches
+.cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+nosetests.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs and local runtime files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.pid
+
+# OS and editor files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# Local datasets. Keep dataset setup documentation tracked.
+datasets/*
+!datasets/README.md
+
+# Local reproduction notes and smoke checks
+reproduction_plan.md
+smoke_test.py
+
+# Downloaded model weights and exported model artifacts
+detlib/weights/*
+*.pt
+*.pth
+*.weights
+*.ckpt
+*.onnx
+*.engine
+*.mlmodel
+*.pb
+*.tflite
+*.torchscript
+*.h5
+*.safetensors
+*_saved_model/
+*_web_model/
+*_openvino_model/
+*_paddle_model/
+
+# Training, evaluation, and detector output directories
+runs/
+results/
+outputs/
+output/
+checkpoints/
+logs/
+wandb/
+mlruns/
+tensorboard/
+lightning_logs/
+
+# Common generated result files
+results*.csv
+results*.txt
+events.out.tfevents*
+
+# YOLO submodule-style local data and outputs
+detlib/yolov3master/runs/
+detlib/yolov3master/data/*
+!detlib/yolov3master/data/*.yaml
+!detlib/yolov3master/data/hyps/
+!detlib/yolov3master/data/scripts/
+!detlib/yolov3master/data/images/
+!detlib/yolov3master/data/images/bus.jpg
+!detlib/yolov3master/data/images/zidane.jpg
+detlib/yolov5master/runs/
+detlib/yolov5master/data/*
+!detlib/yolov5master/data/*.yaml
+!detlib/yolov5master/data/hyps/
+!detlib/yolov5master/data/scripts/
+!detlib/yolov5master/data/images/
+!detlib/yolov5master/data/images/bus.jpg
+!detlib/yolov5master/data/images/zidane.jpg
+
+# Large local archives commonly used for datasets and checkpoints
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
