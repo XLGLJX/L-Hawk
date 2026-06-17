@@ -43,6 +43,7 @@ def flatten_run(run_dir):
         "time": config.get("time"),
         "attack": args.get("attack_type"),
         "model": args.get("det"),
+        "eval_model": args.get("eval_det"),
         "target": args.get("target"),
         "origin": args.get("origin"),
         "eval_dataset": args.get("eval_dataset"),

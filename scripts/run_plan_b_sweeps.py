@@ -34,6 +34,8 @@ def common_demo_args(args):
         "--trigger-search-metric", args.trigger_search_metric,
         "--trigger-search-batch", str(args.trigger_search_batch),
     ]
+    if args.eval_model:
+        cmd.extend(["--eval-det", args.eval_model])
     if args.patch_top is not None:
         cmd.extend(["--patch-top", str(args.patch_top)])
     if args.patch_left is not None:
@@ -94,6 +96,7 @@ def main():
     parser.add_argument("--cfg", default="configs/TA-C.yaml")
     parser.add_argument("--attack", default="TA-C")
     parser.add_argument("--model", default="vgg16")
+    parser.add_argument("--eval-model")
     parser.add_argument("--target", default="920")
     parser.add_argument("--origin", default="person")
     parser.add_argument("--eval-dataset", choices=("kitti", "bdd100k", "coco"), default="coco")

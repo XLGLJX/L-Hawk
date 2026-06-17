@@ -52,6 +52,8 @@ def build_commands(args):
                 ]
                 if args.origin:
                     cmd.extend(["--origin", args.origin])
+                if args.eval_det:
+                    cmd.extend(["--eval-det", args.eval_det])
                 if args.epochs is not None:
                     cmd.extend(["--epochs", str(args.epochs)])
                 if args.train_batch is not None:
@@ -105,6 +107,8 @@ def main():
                         help="Comma-separated COCO class names for HA/CA/TA-D")
     parser.add_argument("--origin", default="stop sign",
                         help="Origin class for TA-D")
+    parser.add_argument("--eval-det",
+                        help="Optional model used only for evaluation/transfer tests")
     parser.add_argument("--exp_dir", default="exp")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--epochs", type=int)

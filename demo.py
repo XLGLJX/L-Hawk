@@ -41,6 +41,8 @@ parser.add_argument('--attack_type', type=str, default=None)
 parser.add_argument('--target', type=str, default=None)
 parser.add_argument('--origin', type=str, default="stop sign")
 parser.add_argument('--det', type=str, default=None)
+parser.add_argument('--eval-det', type=str, default=None,
+                    help="Optional separate model used only for evaluation/transfer tests.")
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--epochs', type=int, default=None)
 parser.add_argument('--train-batch', type=int, default=None)
@@ -258,6 +260,13 @@ if cfg.ATTACKER.TYPE != "TA-C":
 else:
     train_dataloader = evaluate_dataloader = load_imagenet_val(cfg.DATA.TRAIN.IMG_DIR)
     model = get_cls_ens_model(device, cfg.DETECTOR.NAME)
+if args.eval_det is not None:
+    if cfg.ATTACKER.TYPE == "TA-C":
+        eval_model = get_cls_ens_model(device, [args.eval_det])
+    else:
+        eval_model = get_det_model(device, args.eval_det)
+else:
+    eval_model = model
 
 # Size and Location of Images Initialization
 bgsize = (200, 200)  # Size of Background
@@ -388,7 +397,7 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
             random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
             print(f"Select {random_index.item()} mask for Eval.")
             selected_mask = torch.index_select(trigger_mask, 0, random_index)
-        metrics = eval(cfg, model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
+        metrics = eval(cfg, eval_model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
         append_metrics(save_path, metrics)
     patch.save(os.path.join(save_path, f"p_epoch{e}.png"))
     if cfg.ATTACKER.TYPE == "HA":

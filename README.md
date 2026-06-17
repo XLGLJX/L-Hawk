@@ -162,6 +162,27 @@ python scripts/collect_plan_b_results.py \
   --output exp/plan-b/summary.csv
 ```
 
+Transfer tests use `--eval-det` to train on one model and evaluate on another:
+
+```bash
+# Classifier transfer: optimize on VGG16, evaluate on ResNet-50.
+python demo.py --cfg configs/TA-C.yaml --attack_type TA-C \
+  --det vgg16 \
+  --eval-det res50 \
+  --target 920 \
+  --trigger-source laser \
+  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
+
+# Detector transfer: optimize on YOLOv5, evaluate on YOLOv3.
+python demo.py --cfg configs/CA.yaml --attack_type CA \
+  --det yolov5 \
+  --eval-det yolov3 \
+  --target "stop sign" \
+  --eval-dataset kitti \
+  --trigger-source laser \
+  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
+```
+
 ## Physical Attack Demo
 Physical attack demos (such as, indoor/outdoor attacks, various speed attacks, and end-to-end attacks) are available in [Link](https://drive.google.com/drive/folders/1nnzW85pbG9vF1T1T4Tdw6EagopkG_Dv4?usp=sharing).
 
