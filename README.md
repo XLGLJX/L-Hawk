@@ -167,6 +167,14 @@ python scripts/collect_plan_b_results.py \
   --output exp/plan-b/summary.csv
 ```
 
+Compare completed runs against the paper's digital ASR baselines:
+
+```bash
+python scripts/compare_plan_b_to_paper.py \
+  --summary exp/plan-b/summary.csv \
+  --output exp/plan-b/paper_comparison.csv
+```
+
 The sweep helper passes `--seed`, `--experiment-name`, `--profile`, and a
 generated `--run-tag` to `demo.py`, so manually launched sweeps are traceable in
 the collected summary CSV as well.
@@ -254,6 +262,15 @@ Manifest runs pass `--experiment-name`, `--profile`, `--run-tag`, and `--seed`
 to `demo.py`. These fields are saved in each run's `run_config.json`, and
 `scripts/collect_plan_b_results.py` exports them to the summary CSV for
 traceability across smoke and full experiment matrices.
+
+For paper comparison after manifest runs:
+
+```bash
+python scripts/compare_plan_b_to_paper.py \
+  --summary exp/plan-b-manifest/summary.csv \
+  --where profile=full \
+  --output exp/plan-b-manifest/paper_comparison.csv
+```
 
 Example heatmap plots for manifest outputs:
 
