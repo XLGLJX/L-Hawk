@@ -64,6 +64,14 @@ def common_demo_args(args, sweep_value, overrides=None):
         cmd.extend(["--patch-top", str(args.patch_top)])
     if args.patch_left is not None:
         cmd.extend(["--patch-left", str(args.patch_left)])
+    if args.swanlab:
+        cmd.extend([
+            "--swanlab",
+            "--swanlab-project", args.swanlab_project,
+            "--swanlab-mode", args.swanlab_mode,
+        ])
+        if args.swanlab_workspace:
+            cmd.extend(["--swanlab-workspace", args.swanlab_workspace])
     return cmd
 
 
@@ -158,6 +166,10 @@ def main():
     parser.add_argument("--trigger-search-batch", type=int, default=8)
     parser.add_argument("--patch-top", type=int)
     parser.add_argument("--patch-left", type=int)
+    parser.add_argument("--swanlab", action="store_true")
+    parser.add_argument("--swanlab-project", default="l-hawk")
+    parser.add_argument("--swanlab-workspace")
+    parser.add_argument("--swanlab-mode", choices=("online", "local", "offline"), default="online")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

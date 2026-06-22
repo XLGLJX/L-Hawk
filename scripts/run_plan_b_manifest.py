@@ -46,6 +46,9 @@ CLI_KEYS = {
     "patch_size": "--patch-size",
     "patch_top": "--patch-top",
     "patch_left": "--patch-left",
+    "swanlab_project": "--swanlab-project",
+    "swanlab_workspace": "--swanlab-workspace",
+    "swanlab_mode": "--swanlab-mode",
 }
 
 
@@ -106,6 +109,8 @@ def build_command(settings, model, target, profile, experiment_name, sweep_value
     ]
     if eval_model:
         cmd.extend(["--eval-det", eval_model])
+    if settings.get("swanlab"):
+        cmd.append("--swanlab")
     for key, option in CLI_KEYS.items():
         value = settings.get(key)
         if value is not None:
@@ -140,10 +145,21 @@ def main():
     parser.add_argument("--experiments",
                         help="Comma-separated experiment names. Defaults to all experiments.")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--swanlab", action="store_true")
+    parser.add_argument("--swanlab-project", default="l-hawk")
+    parser.add_argument("--swanlab-workspace")
+    parser.add_argument("--swanlab-mode", choices=("online", "local", "offline"), default="online")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     manifest = load_manifest(args.manifest)
+    if args.swanlab:
+        manifest.setdefault("defaults", {}).update({
+            "swanlab": True,
+            "swanlab_project": args.swanlab_project,
+            "swanlab_workspace": args.swanlab_workspace,
+            "swanlab_mode": args.swanlab_mode,
+        })
     experiments = manifest.get("experiments", {})
     if args.list:
         for name, experiment in experiments.items():
