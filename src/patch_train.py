@@ -81,10 +81,12 @@ def train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask,
 
 
 def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, test_loader, e,
-         eval_batch=None, quiet=False):
+         eval_batch=None, quiet=False, capture_sample=False):
     model.eval()
     success, success_1, success_2 = 0, 0, 0
     total_eval = eval_batch or cfg.ATTACKER.EVAL_BATCH
+    sample_index = random.randrange(total_eval) if capture_sample else None
+    visualization_sample = None
     set_resize = torch.empty(total_eval, device=patch.device).uniform_(
         cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
     set_rotate = torch.empty(total_eval, device=patch.device).uniform_(
@@ -116,6 +118,17 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
         else:
             pred1 = model(imgn)
             pred2 = model(imgp)
+        if i == sample_index:
+            if cfg.ATTACKER.TYPE != "TA-C":
+                clean_pred = model(img)[0]
+            else:
+                clean_pred = model(img)
+            visualization_sample = {
+                "clean_image": img[0].detach().cpu(),
+                "attacked_image": imgp[0].detach().cpu(),
+                "clean_prediction": clean_pred.detach().cpu(),
+                "attacked_prediction": pred2.detach().cpu(),
+            }
 
         if cfg.ATTACKER.TYPE != "HA":
             w, h = patch.w, patch.h
@@ -198,4 +211,6 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
             f"No_triggered: {metrics['No_triggered']}; "
             f"Triggered: {metrics['Triggered']}"
         )
+    if capture_sample:
+        return metrics, visualization_sample
     return metrics

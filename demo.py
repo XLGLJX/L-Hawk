@@ -8,6 +8,7 @@ import random
 import re
 from pathlib import Path
 import numpy as np
+from PIL import Image, ImageDraw
 
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 
@@ -106,6 +107,16 @@ parser.add_argument('--patch-top', type=int, default=None,
                     help="Fix patch top coordinate for position sweeps.")
 parser.add_argument('--patch-left', type=int, default=None,
                     help="Fix patch left coordinate for position sweeps.")
+parser.add_argument('--swanlab', action='store_true',
+                    help="Enable SwanLab experiment tracking.")
+parser.add_argument('--swanlab-project', default='l-hawk',
+                    help="SwanLab project name.")
+parser.add_argument('--swanlab-workspace', default=None,
+                    help="Optional SwanLab workspace name.")
+parser.add_argument('--swanlab-mode', choices=('online', 'local', 'offline'), default='online',
+                    help="SwanLab run mode.")
+parser.add_argument('--swanlab-log-dir', default='swanlog',
+                    help="Directory used for SwanLab local run data.")
 args = parser.parse_args()
 
 
@@ -176,6 +187,126 @@ def write_trigger_candidates(save_path, rows):
         return
     with open(os.path.join(save_path, "trigger_candidates.json"), "w", encoding="utf-8") as f:
         json.dump(rows, f, indent=2, ensure_ascii=False)
+
+
+def init_swanlab(save_path, cfg, args):
+    if not args.swanlab:
+        return None
+    try:
+        import swanlab
+    except ImportError as exc:
+        raise SystemExit(
+            "SwanLab tracking requested but the package is not installed. "
+            "Install it with `pip install swanlab`."
+        ) from exc
+
+    init_kwargs = {
+        "project": args.swanlab_project,
+        "name": os.path.basename(save_path),
+        "config": {
+            "args": vars(args),
+            "attack": to_plain(cfg.ATTACKER),
+            "model": to_plain(cfg.DETECTOR),
+            "eval": to_plain(cfg.EVAL),
+        },
+        "mode": args.swanlab_mode,
+        "log_dir": args.swanlab_log_dir,
+        "tags": [str(cfg.ATTACKER.TYPE), slugify(cfg.DETECTOR.NAME)],
+    }
+    if args.swanlab_workspace:
+        init_kwargs["workspace"] = args.swanlab_workspace
+    return swanlab.init(**init_kwargs)
+
+
+def media_epochs(total_epochs, limit=10):
+    count = min(limit, total_epochs)
+    if count <= 0:
+        return set()
+    return set(np.linspace(1, total_epochs, num=count, dtype=int).tolist())
+
+
+def tensor_to_pil(image):
+    return tv.transforms.ToPILImage()(image.clamp(0, 1))
+
+
+def add_image_header(image, text):
+    header_height = 28
+    canvas = Image.new("RGB", (image.width, image.height + header_height), "white")
+    canvas.paste(image, (0, header_height))
+    ImageDraw.Draw(canvas).text((6, 7), text, fill="black")
+    return canvas
+
+
+def imagenet_class_name(index):
+    categories = tv.models.VGG16_BN_Weights.IMAGENET1K_V1.meta["categories"]
+    index = int(index)
+    return categories[index] if 0 <= index < len(categories) else f"class_{index}"
+
+
+def detector_class_name(index, model_name):
+    converter = LabelConverter()
+    index = int(index)
+    categories = converter.category91 if model_name == "faster_rcnn" else converter.category80
+    return categories[index] if 0 <= index < len(categories) else f"class_{index}"
+
+
+def annotate_detections(image, predictions, model_name):
+    annotated = tensor_to_pil(image)
+    draw = ImageDraw.Draw(annotated)
+    if predictions.numel() == 0:
+        return add_image_header(annotated, "Detections: none")
+    predictions = predictions[predictions[:, 4].argsort(descending=True)][:20]
+    for detection in predictions:
+        x1, y1, x2, y2, confidence, class_index = detection.tolist()
+        label = f"{detector_class_name(class_index, model_name)} {confidence:.2f}"
+        draw.rectangle((x1, y1, x2, y2), outline="red", width=2)
+        text_box = draw.textbbox((x1, y1), label)
+        draw.rectangle(text_box, fill="red")
+        draw.text((x1, y1), label, fill="white")
+    return add_image_header(annotated, f"Detections: {len(predictions)} shown")
+
+
+def prepare_swanlab_sample(sample, attack_type, model_name):
+    if attack_type == "TA-C":
+        clean_index = int(sample["clean_prediction"].reshape(-1)[0])
+        attacked_index = int(sample["attacked_prediction"].reshape(-1)[0])
+        clean_name = imagenet_class_name(clean_index)
+        attacked_name = imagenet_class_name(attacked_index)
+        clean_image = add_image_header(
+            tensor_to_pil(sample["clean_image"]),
+            f"Clean prediction: {clean_name} ({clean_index})",
+        )
+        attacked_image = add_image_header(
+            tensor_to_pil(sample["attacked_image"]),
+            f"Attack: {clean_name} -> {attacked_name}",
+        )
+    else:
+        clean_image = annotate_detections(
+            sample["clean_image"], sample["clean_prediction"], model_name)
+        attacked_image = annotate_detections(
+            sample["attacked_image"], sample["attacked_prediction"], model_name)
+    return clean_image, attacked_image
+
+
+def log_swanlab_epoch(run, metrics, epoch, attack_type, model_name,
+                      patch_path=None, sample=None):
+    if run is None:
+        return
+    import swanlab
+
+    payload = {
+        "metrics/ASR": metrics["ASR"],
+        "metrics/No_triggered": metrics["No_triggered"],
+        "metrics/Triggered": metrics["Triggered"],
+    }
+    if patch_path is not None:
+        payload["media/patch"] = swanlab.Image(patch_path)
+    if sample is not None:
+        clean_image, attacked_image = prepare_swanlab_sample(
+            sample, attack_type, model_name)
+        payload["media/clean_input"] = swanlab.Image(clean_image)
+        payload["media/attacked_input"] = swanlab.Image(attacked_image)
+    swanlab.log(payload, step=epoch)
 
 
 def _bounded_triplet(center, radius, lower, upper):
@@ -448,6 +579,8 @@ if not os.path.exists(save_path):
     os.makedirs(save_path)
 write_run_metadata(save_path, cfg, args, time_str)
 write_trigger_candidates(save_path, trigger_metadata)
+swanlab_run = init_swanlab(save_path, cfg, args)
+swanlab_patch_epochs = media_epochs(cfg.ATTACKER.EPOCH)
 
 if cfg.ATTACKER.TYPE == "HA":
     patch = LHawk(psize[0], psize[1], cfg.target_index, device=device, lr=cfg.ATTACKER.LR, momentum=cfg.ATTACKER.MOMENTUM,
@@ -493,14 +626,36 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
             random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
             print(f"Select {random_index.item()} mask for Eval.")
             selected_mask = torch.index_select(trigger_mask, 0, random_index)
-        metrics = eval(cfg, eval_model, relpos, relpos3, patch, patch2, selected_mask, quick_load, evaluate_dataloader, e)
+        if swanlab_run is not None and e in swanlab_patch_epochs:
+            metrics, visualization_sample = eval(
+                cfg, eval_model, relpos, relpos3, patch, patch2, selected_mask,
+                quick_load, evaluate_dataloader, e, capture_sample=True)
+        else:
+            metrics = eval(
+                cfg, eval_model, relpos, relpos3, patch, patch2, selected_mask,
+                quick_load, evaluate_dataloader, e)
+            visualization_sample = None
         append_metrics(save_path, metrics)
         if args.trigger_selection == "async-joint" and e < cfg.ATTACKER.EPOCH:
             trigger_mask, trigger_metadata = build_async_laser_space(
                 selected_meta, args, is_detector_attack, device, next_epoch=e + 1)
             write_trigger_candidates(save_path, trigger_metadata)
-    patch.save(os.path.join(save_path, f"p_epoch{e}.png"))
+    patch_path = os.path.join(save_path, f"p_epoch{e}.png")
+    patch.save(patch_path)
     if cfg.ATTACKER.TYPE == "HA":
         patch2.save(os.path.join(save_path, f"p2_white_epoch{e}.png"))
     if e % cfg.ATTACKER.DECAY_EPOCH == 0:
         patch.opt.lr *= cfg.ATTACKER.STEP_LR
+    log_swanlab_epoch(
+        swanlab_run,
+        metrics,
+        e,
+        cfg.ATTACKER.TYPE,
+        args.eval_det or args.det,
+        patch_path=patch_path if e in swanlab_patch_epochs else None,
+        sample=visualization_sample,
+    )
+
+if swanlab_run is not None:
+    import swanlab
+    swanlab.finish()
