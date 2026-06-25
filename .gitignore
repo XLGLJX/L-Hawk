@@ -49,6 +49,7 @@ nosetests.xml
 .ipynb_checkpoints/
 
 # Logs and local runtime files
+AI_log/
 *.log
 *.tmp
 *.temp
