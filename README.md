@@ -52,6 +52,8 @@ python demo.py --cfg configs/CA.yaml --attack_type CA --det yolov5 --target "sto
 
 Each run writes its generated patches, `run_config.json`, and `metrics.csv` under `exp/`.
 The metrics file records `ASR`, `No_triggered`, and `Triggered` for each epoch.
+For TA-C, evaluation defaults to a fixed 1,000-image ImageNet-1K subset with
+one deterministic image from every class. Training remains randomly sampled.
 
 ### SwanLab Tracking
 
@@ -71,7 +73,7 @@ attacked class change; detector images include predicted boxes and labels.
 
 ```bash
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
-  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20 \
+  --epochs 20 --train-batch 50 --eval-batch 1000 --repeat 20 \
   --exp_dir exp/tac --swanlab --swanlab-project l-hawk
 ```
 
@@ -145,7 +147,7 @@ Patch-size sweeps can be run by changing `--patch-size`, for example:
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det res50 --target 920 \
   --trigger-source laser \
   --patch-size 64 \
-  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
+  --epochs 20 --train-batch 50 --eval-batch 1000 --repeat 20
 ```
 
 Plan-B sweep helper:
@@ -244,7 +246,7 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C \
   --eval-det res50 \
   --target 920 \
   --trigger-source laser \
-  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
+  --epochs 20 --train-batch 50 --eval-batch 1000 --repeat 20
 
 # Detector transfer: optimize on YOLOv5, evaluate on YOLOv3.
 python demo.py --cfg configs/CA.yaml --attack_type CA \

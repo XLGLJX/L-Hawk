@@ -46,6 +46,37 @@ def load_imagenet_val(dataset: str,
     )
 
 
+def load_imagenet_one_per_class_val(dataset: str, inc: bool = False) -> DataLoader:
+    """Build a deterministic ImageNet-1K validation loader with one image per class."""
+    transform = tv.transforms.Compose([
+        tv.transforms.Resize(299),
+        tv.transforms.CenterCrop((299, 299)),
+        tv.transforms.ToTensor(),
+    ]) if inc else tv.transforms.Compose([
+        tv.transforms.Resize(256),
+        tv.transforms.CenterCrop((224, 224)),
+        tv.transforms.ToTensor(),
+    ])
+    imagenet = tv.datasets.ImageFolder(dataset, transform=transform)
+    selected_indices = []
+    seen_classes = set()
+    for index, (_, class_index) in enumerate(imagenet.samples):
+        if class_index not in seen_classes:
+            selected_indices.append(index)
+            seen_classes.add(class_index)
+    if len(selected_indices) != len(imagenet.classes):
+        raise RuntimeError(
+            f"Expected one sample for each ImageNet class, found "
+            f"{len(selected_indices)} of {len(imagenet.classes)}."
+        )
+    return DataLoader(
+        torch.utils.data.Subset(imagenet, selected_indices),
+        batch_size=1,
+        shuffle=False,
+        num_workers=0,
+    )
+
+
 def read_img(path: str, device: str, crop_size: int = None) -> torch.Tensor:
     if crop_size is None:
         tr = tv.transforms.ToTensor()

@@ -506,7 +506,10 @@ if cfg.ATTACKER.TYPE != "TA-C":
         evaluate_dataloader = load_kitti(cfg=cfg)
     model = get_det_model(device, cfg.DETECTOR.NAME)
 else:
-    train_dataloader = evaluate_dataloader = load_imagenet_val(cfg.DATA.TRAIN.IMG_DIR)
+    train_dataloader = load_imagenet_val(cfg.DATA.TRAIN.IMG_DIR)
+    evaluate_dataloader = load_imagenet_one_per_class_val(cfg.DATA.TRAIN.IMG_DIR)
+    if args.eval_batch is None:
+        cfg.ATTACKER.EVAL_BATCH = 1000
     model = get_cls_ens_model(device, cfg.DETECTOR.NAME)
 if args.eval_det is not None:
     if cfg.ATTACKER.TYPE == "TA-C":
