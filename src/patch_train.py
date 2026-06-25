@@ -20,6 +20,7 @@ def train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask,
         model.eval()
     total_loss = torch.zeros(1, device=device)
     log_loss = torch.zeros(5, device=device)
+    update_count = 0
     for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=cfg.ATTACKER.TRAIN_BATCH):
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
@@ -68,9 +69,10 @@ def train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask,
             loss5 = nps_loss(patch.data)
             loss = (1 / last_scale ** 2) * (loss1 + cfg.ATTACKER.ALPHA * loss2) + cfg.ATTACKER.BETA * loss3 + cfg.ATTACKER.CETA * loss4 + cfg.ATTACKER.DELTA * loss5
             if torch.isnan(loss).any(): continue
-            total_loss += loss
+            total_loss += loss.detach()
             log_loss += torch.tensor((loss1.item(), loss2.item(), loss3.item(), loss4.item(), loss5.item()),
                                      device=device)
+            update_count += 1
             patch.update(loss)
 
         if (i + 1) == cfg.ATTACKER.TRAIN_BATCH:
@@ -78,6 +80,25 @@ def train(cfg, model, relpos, relpos3, patch, patch2, trigger_mask,
         else:
             del imgn, imgp, last_scale, loss1, loss2, loss3, loss4, loss5, loss
             torch.cuda.empty_cache()
+
+    if update_count == 0:
+        return {
+            "total": 0.0,
+            "loss1_triggered_attack": 0.0,
+            "loss2_aux_no_trigger": 0.0,
+            "loss3_tv": 0.0,
+            "loss4_content": 0.0,
+            "loss5_nps": 0.0,
+        }
+    avg_losses = (log_loss / update_count).detach().cpu().tolist()
+    return {
+        "total": float((total_loss / update_count).item()),
+        "loss1_triggered_attack": float(avg_losses[0]),
+        "loss2_aux_no_trigger": float(avg_losses[1]),
+        "loss3_tv": float(avg_losses[2]),
+        "loss4_content": float(avg_losses[3]),
+        "loss5_nps": float(avg_losses[4]),
+    }
 
 
 def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, test_loader, e,

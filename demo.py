@@ -289,6 +289,7 @@ def prepare_swanlab_sample(sample, attack_type, model_name):
 
 
 def log_swanlab_epoch(run, metrics, epoch, attack_type, model_name,
+                      train_losses=None,
                       patch_path=None, sample=None):
     if run is None:
         return
@@ -299,13 +300,27 @@ def log_swanlab_epoch(run, metrics, epoch, attack_type, model_name,
         "metrics/No_triggered": metrics["No_triggered"],
         "metrics/Triggered": metrics["Triggered"],
     }
+    if train_losses is not None:
+        payload.update({
+            "loss/total": train_losses["total"],
+            "loss/loss1_triggered_attack": train_losses["loss1_triggered_attack"],
+            "loss/loss2_aux_no_trigger": train_losses["loss2_aux_no_trigger"],
+            "loss/loss3_tv": train_losses["loss3_tv"],
+            "loss/loss4_content": train_losses["loss4_content"],
+            "loss/loss5_nps": train_losses["loss5_nps"],
+        })
+    media_images = []
     if patch_path is not None:
-        payload["media/patch"] = swanlab.Image(patch_path)
+        media_images.append(swanlab.Image(patch_path, caption="patch"))
     if sample is not None:
         clean_image, attacked_image = prepare_swanlab_sample(
             sample, attack_type, model_name)
-        payload["media/clean_input"] = swanlab.Image(clean_image)
-        payload["media/attacked_input"] = swanlab.Image(attacked_image)
+        media_images.extend([
+            swanlab.Image(clean_image, caption="clean_input"),
+            swanlab.Image(attacked_image, caption="attacked_input"),
+        ])
+    if media_images:
+        payload["media/epoch_images"] = media_images
     swanlab.log(payload, step=epoch)
 
 
@@ -604,7 +619,9 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
         train_trigger_mask = trigger_mask
     else:
         train_trigger_mask = trigger_mask
-    train(cfg, model, relpos, relpos3, patch, patch2, train_trigger_mask, content_loss, tv_loss, nps_loss, quick_load, train_dataloader, device, e)
+    train_losses = train(
+        cfg, model, relpos, relpos3, patch, patch2, train_trigger_mask,
+        content_loss, tv_loss, nps_loss, quick_load, train_dataloader, device, e)
     with torch.no_grad():
         if args.trigger_selection == "async-joint":
             selected_mask, selected_meta, selected_metrics = select_trigger_candidate(
@@ -652,6 +669,7 @@ for e in range(1, cfg.ATTACKER.EPOCH + 1):
         e,
         cfg.ATTACKER.TYPE,
         args.eval_det or args.det,
+        train_losses=train_losses,
         patch_path=patch_path if e in swanlab_patch_epochs else None,
         sample=visualization_sample,
     )
