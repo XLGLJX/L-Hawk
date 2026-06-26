@@ -59,6 +59,8 @@ parser.add_argument('--eval-batch', type=int, default=None)
 parser.add_argument('--repeat', type=int, default=None)
 parser.add_argument('--batch-size', type=int, default=None,
                     help="Training dataloader batch size. Overrides DETECTOR.BATCH_SIZE.")
+parser.add_argument('--fixed-dataset-size', type=int, default=10000,
+                    help="Fixed train/eval subset size. ImageNet is class-balanced; COCO is approximately class-balanced.")
 parser.add_argument('--eval-dataset', choices=("kitti", "bdd100k", "coco"), default="coco")
 parser.add_argument('--content-pretrained', action="store_true",
                     help='Use torchvision pretrained VGG19 for content loss; may require cached/downloaded weights.')
@@ -648,6 +650,8 @@ if args.trigger_search_batch is None:
     args.trigger_search_batch = cfg.DETECTOR.BATCH_SIZE
 if args.trigger_search_batch < 1:
     raise ValueError("--trigger-search-batch must be at least 1")
+if args.fixed_dataset_size < 1:
+    raise ValueError("--fixed-dataset-size must be at least 1")
 cfg.ATTACKER.FIXED_TOP = args.patch_top
 cfg.ATTACKER.FIXED_LEFT = args.patch_left
 
@@ -656,22 +660,47 @@ logger(cfg, args)
 
 if cfg.ATTACKER.TYPE != "TA-C":
     train_dataloader = load_coco(
-        cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR, batch_size=cfg.DETECTOR.BATCH_SIZE)
+        cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR,
+        batch_size=cfg.DETECTOR.BATCH_SIZE,
+        size=args.fixed_dataset_size,
+        seed=args.seed,
+        shuffle=True)
     if args.eval_dataset == "coco":
         evaluate_dataloader = load_coco(
-            cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR, batch_size=cfg.DETECTOR.BATCH_SIZE)
+            cfg.DATA.TRAIN.IMG_DIR, cfg.DATA.TRAIN.LAB_DIR,
+            batch_size=cfg.DETECTOR.BATCH_SIZE,
+            size=args.fixed_dataset_size,
+            seed=args.seed,
+            shuffle=False)
+        if args.eval_batch is None:
+            cfg.ATTACKER.EVAL_BATCH = args.fixed_dataset_size
     elif args.eval_dataset == "bdd100k":
-        evaluate_dataloader = load_bdd100k(cfg=cfg, batch_size=cfg.DETECTOR.BATCH_SIZE)
+        evaluate_dataloader = load_bdd100k(
+            cfg=cfg, batch_size=cfg.DETECTOR.BATCH_SIZE,
+            shuffle=False, subset_size=args.fixed_dataset_size,
+            seed=args.seed)
+        if args.eval_batch is None:
+            cfg.ATTACKER.EVAL_BATCH = min(args.fixed_dataset_size, len(evaluate_dataloader.dataset))
     else:
-        evaluate_dataloader = load_kitti(cfg=cfg, batch_size=cfg.DETECTOR.BATCH_SIZE)
+        evaluate_dataloader = load_kitti(
+            cfg=cfg, batch_size=cfg.DETECTOR.BATCH_SIZE,
+            shuffle=False, subset_size=args.fixed_dataset_size,
+            seed=args.seed)
+        if args.eval_batch is None:
+            cfg.ATTACKER.EVAL_BATCH = min(args.fixed_dataset_size, len(evaluate_dataloader.dataset))
     model = get_det_model(device, cfg.DETECTOR.NAME)
 else:
-    train_dataloader = load_imagenet_val(
-        cfg.DATA.TRAIN.IMG_DIR, batch_size=cfg.DETECTOR.BATCH_SIZE)
-    evaluate_dataloader = load_imagenet_one_per_class_val(
-        cfg.DATA.TRAIN.IMG_DIR, batch_size=cfg.DETECTOR.BATCH_SIZE)
+    fixed_imagenet_subset = build_imagenet_balanced_subset(
+        cfg.DATA.TRAIN.IMG_DIR, size=args.fixed_dataset_size,
+        seed=args.seed)
+    train_dataloader = make_dataloader(
+        fixed_imagenet_subset, batch_size=cfg.DETECTOR.BATCH_SIZE,
+        shuffle=True, seed=args.seed)
+    evaluate_dataloader = make_dataloader(
+        fixed_imagenet_subset, batch_size=cfg.DETECTOR.BATCH_SIZE,
+        shuffle=False, seed=args.seed)
     if args.eval_batch is None:
-        cfg.ATTACKER.EVAL_BATCH = 1000
+        cfg.ATTACKER.EVAL_BATCH = len(fixed_imagenet_subset)
     model = get_cls_ens_model(device, cfg.DETECTOR.NAME)
 if args.eval_det is not None:
     if cfg.ATTACKER.TYPE == "TA-C":

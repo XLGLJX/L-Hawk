@@ -20,21 +20,90 @@ def load_imagenet_preprocess() -> tv.transforms.Normalize:
         std=[0.229, 0.224, 0.225],
     )
 
+def _imagenet_transform(inc: bool = False):
+    return tv.transforms.Compose([
+        tv.transforms.Resize(299),
+        tv.transforms.CenterCrop((299, 299)),
+        tv.transforms.ToTensor(),
+    ]) if inc else tv.transforms.Compose([
+        tv.transforms.Resize(256),
+        tv.transforms.CenterCrop((224, 224)),
+        tv.transforms.ToTensor(),
+    ])
+
+
+def make_dataloader(dataset,
+                    batch_size: int = 1,
+                    shuffle: bool = False,
+                    seed: int = 0) -> DataLoader:
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+
+    def seed_worker(worker_id):
+        worker_seed = seed + worker_id
+        random.seed(worker_seed)
+        np.random.seed(worker_seed % (2 ** 32))
+        torch.manual_seed(worker_seed)
+
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=5 if batch_size >= 10 else 0,
+        generator=generator,
+        worker_init_fn=seed_worker,
+    )
+
+
+def build_imagenet_balanced_subset(dataset: str,
+                                   size: int = 10000,
+                                   inc: bool = False,
+                                   seed: int = 0):
+    """Build a deterministic ImageNet subset distributed evenly by class."""
+    imagenet = tv.datasets.ImageFolder(dataset, transform=_imagenet_transform(inc))
+    num_classes = len(imagenet.classes)
+    if size < num_classes:
+        raise ValueError(
+            f"Requested fixed ImageNet subset size {size}, but at least "
+            f"{num_classes} samples are needed to cover every class.")
+
+    per_class = size // num_classes
+    remainder = size % num_classes
+    by_class = [[] for _ in range(num_classes)]
+    for index, (_, class_index) in enumerate(imagenet.samples):
+        by_class[class_index].append(index)
+
+    rng = random.Random(seed)
+    selected_indices = []
+    for class_index, indices in enumerate(by_class):
+        quota = per_class + (1 if class_index < remainder else 0)
+        if len(indices) < quota:
+            raise RuntimeError(
+                f"Class {imagenet.classes[class_index]} only has {len(indices)} "
+                f"samples, fewer than requested quota {quota}.")
+        indices = indices[:]
+        rng.shuffle(indices)
+        selected_indices.extend(indices[:quota])
+    selected_indices.sort()
+    return torch.utils.data.Subset(imagenet, selected_indices)
+
+
+def load_imagenet_balanced_subset(dataset: str,
+                                  batch_size: int = 1,
+                                  size: int = 10000,
+                                  shuffle: bool = False,
+                                  inc: bool = False,
+                                  seed: int = 0) -> DataLoader:
+    subset = build_imagenet_balanced_subset(dataset, size=size, inc=inc, seed=seed)
+    return make_dataloader(subset, batch_size=batch_size, shuffle=shuffle, seed=seed)
+
+
 def load_imagenet_val(dataset: str,
                       batch_size: int = 1,
                       size: int = 50000,
                       shuffle: bool = True,
                       inc: bool = False) -> DataLoader:
-    imagenet = tv.datasets.ImageFolder(dataset,
-                                       transform=tv.transforms.Compose([
-                                           tv.transforms.Resize(299),
-                                           tv.transforms.CenterCrop((299, 299)),
-                                           tv.transforms.ToTensor(),
-                                       ]) if inc else tv.transforms.Compose([
-                                           tv.transforms.Resize(256),
-                                           tv.transforms.CenterCrop((224, 224)),
-                                           tv.transforms.ToTensor(),
-                                       ]))
+    imagenet = tv.datasets.ImageFolder(dataset, transform=_imagenet_transform(inc))
     if size != 50000:
         partial = [size, 50000 - size]
         imagenet, _ = random_split(imagenet, partial)

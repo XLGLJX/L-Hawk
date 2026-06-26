@@ -70,20 +70,87 @@ def _image_only_collate(batch):
     return torch.stack(images, 0)
 
 
-def load_coco(img_path, ann_path, batch_size=1):
+def _build_coco_dataset(img_path, ann_path):
+    return tv.datasets.CocoDetection(
+        img_path,
+        ann_path,
+        transform=tv.transforms.Compose([
+            tv.transforms.Resize(640),
+            tv.transforms.CenterCrop((640, 640)),
+            tv.transforms.ToTensor(),
+        ]),
+    )
+
+
+def _balanced_coco_indices(dataset, size=10000, seed=0):
+    """Select a deterministic approximate class-balanced COCO image subset.
+
+    COCO images can contain multiple classes, so perfect per-class balancing is
+    not well-defined at image level.  This routine cycles through categories,
+    selects a per-category quota without duplicate images, then fills any
+    remaining slots deterministically.
+    """
+    total = len(dataset)
+    if size is None or size <= 0 or size >= total:
+        return list(range(total))
+
+    coco = dataset.coco
+    image_id_to_index = {image_id: index for index, image_id in enumerate(dataset.ids)}
+    category_ids = sorted(coco.getCatIds())
+    if not category_ids:
+        return list(range(min(size, total)))
+
+    rng = random.Random(seed)
+    per_class = size // len(category_ids)
+    remainder = size % len(category_ids)
+    selected = []
+    selected_set = set()
+
+    for category_offset, category_id in enumerate(category_ids):
+        quota = per_class + (1 if category_offset < remainder else 0)
+        image_ids = sorted(coco.getImgIds(catIds=[category_id]))
+        rng.shuffle(image_ids)
+        chosen_for_class = 0
+        for image_id in image_ids:
+            index = image_id_to_index.get(image_id)
+            if index is None or index in selected_set:
+                continue
+            selected.append(index)
+            selected_set.add(index)
+            chosen_for_class += 1
+            if chosen_for_class >= quota:
+                break
+
+    if len(selected) < size:
+        remaining = [index for index in range(total) if index not in selected_set]
+        rng.shuffle(remaining)
+        selected.extend(remaining[:size - len(selected)])
+
+    selected = selected[:size]
+    selected.sort()
+    return selected
+
+
+def load_coco(img_path, ann_path, batch_size=1, size=None, seed=0, shuffle=True):
+    dataset = _build_coco_dataset(img_path, ann_path)
+    if size is not None:
+        dataset = torch.utils.data.Subset(
+            dataset, _balanced_coco_indices(dataset, size=size, seed=seed))
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+
+    def seed_worker(worker_id):
+        worker_seed = seed + worker_id
+        random.seed(worker_seed)
+        torch.manual_seed(worker_seed)
+
     return DataLoader(
-        tv.datasets.CocoDetection(
-            img_path,
-            ann_path,
-            transform=tv.transforms.Compose([
-                tv.transforms.Resize(640),
-                tv.transforms.CenterCrop((640, 640)),
-                tv.transforms.ToTensor(),
-            ]),
-        ),
+        dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle,
         collate_fn=_image_only_collate,
+        generator=generator,
+        worker_init_fn=seed_worker,
     )
 
 

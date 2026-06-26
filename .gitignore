@@ -72,6 +72,8 @@ datasets/*
 # Local reproduction notes and smoke checks
 reproduction_plan.md
 smoke_test.py
+AGENTS.md
+Liu 等 - 2025 - L-HAWK A Controllable Physical Adversarial Patch Against a Long-Distance Target.pdf
 
 # Downloaded model weights and exported model artifacts
 detlib/weights/*
