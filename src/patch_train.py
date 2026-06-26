@@ -41,6 +41,9 @@ def _value_at(value, idx):
 
 
 def _apply_patch_batch(patch_obj, img, positions, **kwargs):
+    if not patch_obj.eot:
+        kwargs.pop("set_resize", None)
+        kwargs.pop("set_rotate", None)
     if not _is_batched_positions(positions):
         out = patch_obj.apply(img, positions, **kwargs)
         return out, [patch_obj.last_scale for _ in range(img.size(0))]
@@ -352,10 +355,15 @@ def score_trigger_loss(
         model.eval()
     total_loss = torch.zeros(1, device=device)
     evaluated = 0
-    set_resize = torch.empty(search_batch, device=patch.device).uniform_(
-        cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
-    set_rotate = torch.empty(search_batch, device=patch.device).uniform_(
-        -cfg.EVAL.ANGLE_EVAL, cfg.EVAL.ANGLE_EVAL)
+    use_eval_eot = patch.eot or (cfg.ATTACKER.TYPE == "HA" and patch2.eot)
+    set_resize = (
+        torch.empty(search_batch, device=patch.device).uniform_(cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
+        if use_eval_eot else None
+    )
+    set_rotate = (
+        torch.empty(search_batch, device=patch.device).uniform_(-cfg.EVAL.ANGLE_EVAL, cfg.EVAL.ANGLE_EVAL)
+        if use_eval_eot else None
+    )
     pbar = tqdm(desc=f'Trigger loss epoch {e}', total=search_batch, disable=quiet)
     with torch.no_grad():
         for img in data_loader:
@@ -373,8 +381,14 @@ def score_trigger_loss(
                 pos = _random_positions(patch, cfg, (h, w), batch_size)
                 imgn, scales = _apply_patch_batch(
                     patch, img, pos, test_mode=True,
-                    set_resize=set_resize[batch_start:batch_start + batch_size],
-                    set_rotate=set_rotate[batch_start:batch_start + batch_size],
+                    set_resize=(
+                        set_resize[batch_start:batch_start + batch_size]
+                        if set_resize is not None else None
+                    ),
+                    set_rotate=(
+                        set_rotate[batch_start:batch_start + batch_size]
+                        if set_rotate is not None else None
+                    ),
                     do_random_color=True)
                 if cfg.ATTACKER.TYPE == "CA" or cfg.ATTACKER.TYPE == "TA-D":
                     gt_box, _, _, _ = _make_boxes(
@@ -396,8 +410,14 @@ def score_trigger_loss(
                         patch2.data, relpos2, test_mode=True, do_random_color=True)
                 imgn, scales = _apply_patch_batch(
                     patch2, img, pos, test_mode=True,
-                    set_resize=set_resize[batch_start:batch_start + batch_size],
-                    set_rotate=set_rotate[batch_start:batch_start + batch_size],
+                    set_resize=(
+                        set_resize[batch_start:batch_start + batch_size]
+                        if set_resize is not None else None
+                    ),
+                    set_rotate=(
+                        set_rotate[batch_start:batch_start + batch_size]
+                        if set_rotate is not None else None
+                    ),
                     do_random_color=False)
                 gt_box, _, _, _ = _make_boxes(
                     patch2, pos, cfg.DETECTOR.NAME[:4].upper(), batch_size=batch_size, scales=scales)
@@ -444,10 +464,15 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
     total_eval = eval_batch or cfg.ATTACKER.EVAL_BATCH
     sample_index = random.randrange(total_eval) if capture_sample else None
     visualization_sample = None
-    set_resize = torch.empty(total_eval, device=patch.device).uniform_(
-        cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
-    set_rotate = torch.empty(total_eval, device=patch.device).uniform_(
-        -cfg.EVAL.ANGLE_EVAL, cfg.EVAL.ANGLE_EVAL)
+    use_eval_eot = patch.eot or (cfg.ATTACKER.TYPE == "HA" and patch2.eot)
+    set_resize = (
+        torch.empty(total_eval, device=patch.device).uniform_(cfg.EVAL.SCALE_EVAL, cfg.EVAL.SCALE_EVAL)
+        if use_eval_eot else None
+    )
+    set_rotate = (
+        torch.empty(total_eval, device=patch.device).uniform_(-cfg.EVAL.ANGLE_EVAL, cfg.EVAL.ANGLE_EVAL)
+        if use_eval_eot else None
+    )
     evaluated = 0
     pbar = tqdm(desc=f'Testing epoch {e}', total=total_eval, disable=quiet)
     for img in test_loader:
@@ -465,8 +490,14 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
             pos = _random_positions(patch, cfg, (h, w), batch_size)
             imgn, scales = _apply_patch_batch(
                 patch, img, pos, test_mode=True,
-                set_resize=set_resize[batch_start:batch_start + batch_size],
-                set_rotate=set_rotate[batch_start:batch_start + batch_size],
+                set_resize=(
+                    set_resize[batch_start:batch_start + batch_size]
+                    if set_resize is not None else None
+                ),
+                set_rotate=(
+                    set_rotate[batch_start:batch_start + batch_size]
+                    if set_rotate is not None else None
+                ),
                 do_random_color=True)
         else:
             pos = _random_positions(patch2, cfg, (h, w), batch_size)
@@ -479,8 +510,14 @@ def eval(cfg, model, relpos, relpos3, patch, patch2, trigger_mask, quick_load, t
                 patch2.data = patch.apply(patch2.data, relpos2, test_mode=True, do_random_color=True)
             imgn, scales = _apply_patch_batch(
                 patch2, img, pos, test_mode=True,
-                set_resize=set_resize[batch_start:batch_start + batch_size],
-                set_rotate=set_rotate[batch_start:batch_start + batch_size],
+                set_resize=(
+                    set_resize[batch_start:batch_start + batch_size]
+                    if set_resize is not None else None
+                ),
+                set_rotate=(
+                    set_rotate[batch_start:batch_start + batch_size]
+                    if set_rotate is not None else None
+                ),
                 do_random_color=False)
         imgp = _apply_trigger_to_patch_aligned(
             cfg, imgn, trigger_mask, pos, patch2 if cfg.ATTACKER.TYPE == "HA" else patch)

@@ -718,7 +718,11 @@ relpos3 = (
 )
 
 # Adversarial Patch Initialization
-patch2 = LHawk(bgsize[0], bgsize[1], cfg.target_index, device, eot=cfg.ATTACKER.PATCH.EOT,
+# For HA, patch2 is the 200x200 stop-sign carrier.  It must not inherit the
+# L-Hawk patch EOT settings; otherwise eval-time resize can shrink the whole
+# stop sign and make a 50px laser stripe appear to cover it entirely.
+patch2_eot = False if cfg.ATTACKER.TYPE == "HA" else cfg.ATTACKER.PATCH.EOT
+patch2 = LHawk(bgsize[0], bgsize[1], cfg.target_index, device, eot=patch2_eot,
                 eot_scale=cfg.ATTACKER.PATCH.SCALE, eot_angle=cfg.ATTACKER.PATCH.ANGLE, p=1)
 resize = tv.transforms.Resize(bgsize)
 quick_load = lambda x: resize(patch2.pil2tensor(Image.open(x))).unsqueeze(0).to(device)

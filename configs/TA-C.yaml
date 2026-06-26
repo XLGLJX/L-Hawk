@@ -29,10 +29,10 @@ ATTACKER:
     WIDTH: 48
     HEIGHT: 48
     CONTENT: "assets/pikachu.jpg"
-    EOT: True
+    EOT: False
     SCALE: 0.3
     ANGLE: 0.1
 
 EVAL:
-  SCALE_EVAL: 0.48
-  ANGLE_EVAL: 0.1
+  SCALE_EVAL: 1.0
+  ANGLE_EVAL: 0.0

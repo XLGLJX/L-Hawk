@@ -34,10 +34,10 @@ ATTACKER:
     WIDTH: 48
     HEIGHT: 48
     CONTENT: "assets/stop.png"
-    EOT: True
+    EOT: False
     SCALE: 0.2
     ANGLE: 0.1
 
 EVAL:
-  SCALE_EVAL: 0.24
-  ANGLE_EVAL: 0.1
+  SCALE_EVAL: 1.0
+  ANGLE_EVAL: 0.0
