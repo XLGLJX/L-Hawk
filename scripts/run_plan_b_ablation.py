@@ -39,7 +39,7 @@ def tracking_args(args, mode):
 
 
 def build_base_command(args, mode):
-    return [
+    cmd = [
         sys.executable,
         "demo.py",
         "--cfg", args.cfg,
@@ -50,7 +50,6 @@ def build_base_command(args, mode):
         "--eval-dataset", args.eval_dataset,
         "--exp_dir", args.exp_dir,
         "--epochs", str(args.epochs),
-        "--train-batch", str(args.train_batch),
         "--eval-batch", str(args.eval_batch),
         "--repeat", str(args.repeat),
         *tracking_args(args, mode),
@@ -64,6 +63,9 @@ def build_base_command(args, mode):
         "--trigger-search-metric", args.trigger_search_metric,
         "--trigger-search-batch", str(args.trigger_search_batch),
     ]
+    if args.train_batch is not None:
+        cmd.extend(["--train-batch", str(args.train_batch)])
+    return cmd
 
 
 def build_commands(args):
@@ -107,7 +109,8 @@ def main():
     parser.add_argument("--run-tag-prefix",
                         help="Optional prefix added to generated run tags.")
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--train-batch", type=int, default=50)
+    parser.add_argument("--train-batch", type=int, default=None,
+                        help="Optional max train batches per epoch for debugging. Defaults to full dataloader epoch.")
     parser.add_argument("--eval-batch", type=int, default=800)
     parser.add_argument("--repeat", type=int, default=20)
     parser.add_argument("--laser-model", choices=("linear", "sigmoid", "gaussian"), default="linear")

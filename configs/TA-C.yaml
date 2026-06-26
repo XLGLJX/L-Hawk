@@ -5,13 +5,13 @@ DATA:
 DETECTOR:
   NAME: ['vgg13', 'vgg16', 'vgg19']  # ['vgg13', 'vgg16', 'vgg19', 'res50', 'res101', 'res152', 'incv3', 'mobv2']
   INPUT_SIZE: [224, 224]
-  BATCH_SIZE: 1
+  BATCH_SIZE: 32
 
 ATTACKER:
   TYPE: "TA-C"
   EPOCH: 20
   DECAY_EPOCH: 4
-  TRAIN_BATCH: 50
+  TRAIN_BATCH:
   REPEAT: 20
   EVAL_BATCH: 1000
   LR: 0.01
@@ -26,8 +26,8 @@ ATTACKER:
   DOUBLE_APPLY: False
 
   PATCH:
-    WIDTH: 100
-    HEIGHT: 100
+    WIDTH: 48
+    HEIGHT: 48
     CONTENT: "assets/pikachu.jpg"
     EOT: True
     SCALE: 0.3

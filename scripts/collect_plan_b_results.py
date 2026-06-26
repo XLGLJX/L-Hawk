@@ -24,19 +24,6 @@ def flatten_run(run_dir):
     args = config.get("args", {})
     metrics = read_csv_last(run_dir / "metrics.csv")
     selection = read_csv_last(run_dir / "trigger_selection.csv")
-    candidates = read_json(run_dir / "trigger_candidates.json") or []
-
-    selected_candidate = {}
-    selected_index = selection.get("selected_index")
-    if selected_index not in (None, ""):
-        try:
-            selected_index = int(selected_index)
-            for candidate in candidates:
-                if candidate.get("index") == selected_index:
-                    selected_candidate = candidate
-                    break
-        except ValueError:
-            selected_index = None
 
     return {
         "run_dir": str(run_dir),
@@ -67,7 +54,6 @@ def flatten_run(run_dir):
         "async_distance_radius": args.get("async_distance_radius"),
         "async_angle_radius": args.get("async_angle_radius"),
         "async_light_radius": args.get("async_light_radius"),
-        "async_shrink": args.get("async_shrink"),
         "patch_size": args.get("patch_size"),
         "patch_top": args.get("patch_top"),
         "patch_left": args.get("patch_left"),
@@ -77,11 +63,11 @@ def flatten_run(run_dir):
         "No_triggered": metrics.get("No_triggered"),
         "Triggered": metrics.get("Triggered"),
         "trigger_selection_phase": selection.get("phase"),
-        "selected_trigger_index": selection.get("selected_index"),
-        "selected_power_mw": selection.get("power_mw") or selected_candidate.get("power_mw"),
-        "selected_distance_m": selection.get("distance_m") or selected_candidate.get("distance_m"),
-        "selected_angle_deg": selection.get("angle_deg") or selected_candidate.get("angle_deg"),
-        "selected_ambient_lux": selection.get("ambient_lux") or selected_candidate.get("ambient_lux"),
+        "selected_trigger_loss": selection.get("loss_value"),
+        "selected_p_mw": selection.get("p_mw"),
+        "selected_d_m": selection.get("d_m"),
+        "selected_theta_deg": selection.get("theta_deg"),
+        "selected_l_lux": selection.get("l_lux"),
     }
 
 

@@ -17,9 +17,9 @@ ATTACKER:
   DOUBLE_APPLY: False
   EPOCH: 20
   DECAY_EPOCH: 4
-  TRAIN_BATCH: 50
+  TRAIN_BATCH:
   REPEAT: 20
-  EVAL_BATCH: 800
+  EVAL_BATCH: 1600
   LR: 0.01
   STEP_LR: 0.3
   MOMENTUM: 0.9
@@ -32,8 +32,8 @@ ATTACKER:
   TARGET_LABEL: 'stop sign'  # eight attack labels ['person', 'bicycle', 'car', 'motorcycle', 'bus', 'truck', 'traffic light', 'stop sign']
 
   PATCH:
-    WIDTH: 200
-    HEIGHT: 200
+    WIDTH: 48
+    HEIGHT: 48
     CONTENT: "assets/pikachu.jpg"
     EOT: True
     SCALE: 0.2

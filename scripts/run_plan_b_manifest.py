@@ -42,7 +42,6 @@ CLI_KEYS = {
     "async_distance_radius": "--async-distance-radius",
     "async_angle_radius": "--async-angle-radius",
     "async_light_radius": "--async-light-radius",
-    "async_shrink": "--async-shrink",
     "patch_size": "--patch-size",
     "patch_top": "--patch-top",
     "patch_left": "--patch-left",

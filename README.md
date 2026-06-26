@@ -54,6 +54,8 @@ Each run writes its generated patches, `run_config.json`, and `metrics.csv` unde
 The metrics file records `ASR`, `No_triggered`, and `Triggered` for each epoch.
 For TA-C, evaluation defaults to a fixed 1,000-image ImageNet-1K subset with
 one deterministic image from every class. Training remains randomly sampled.
+By default, one training epoch means one full pass over the training dataloader;
+`--train-batch N` is only an optional debugging cap.
 
 ### SwanLab Tracking
 
@@ -73,7 +75,7 @@ attacked class change; detector images include predicted boxes and labels.
 
 ```bash
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 920 \
-  --epochs 20 --train-batch 50 --eval-batch 1000 --repeat 20 \
+  --epochs 20 --eval-batch 1000 --repeat 20 \
   --exp_dir exp/tac --swanlab --swanlab-project l-hawk
 ```
 
@@ -137,8 +139,7 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det vgg16 --target 9
   --async-power-radius 10 \
   --async-distance-radius 5 \
   --async-angle-radius 5 \
-  --async-light-radius 200 \
-  --async-shrink 0.75
+  --async-light-radius 200
 ```
 
 Patch-size sweeps can be run by changing `--patch-size`, for example:
@@ -147,7 +148,7 @@ Patch-size sweeps can be run by changing `--patch-size`, for example:
 python demo.py --cfg configs/TA-C.yaml --attack_type TA-C --det res50 --target 920 \
   --trigger-source laser \
   --patch-size 64 \
-  --epochs 20 --train-batch 50 --eval-batch 1000 --repeat 20
+  --epochs 20 --eval-batch 1000 --repeat 20
 ```
 
 Plan-B sweep helper:
@@ -246,7 +247,7 @@ python demo.py --cfg configs/TA-C.yaml --attack_type TA-C \
   --eval-det res50 \
   --target 920 \
   --trigger-source laser \
-  --epochs 20 --train-batch 50 --eval-batch 1000 --repeat 20
+  --epochs 20 --eval-batch 1000 --repeat 20
 
 # Detector transfer: optimize on YOLOv5, evaluate on YOLOv3.
 python demo.py --cfg configs/CA.yaml --attack_type CA \
@@ -255,7 +256,7 @@ python demo.py --cfg configs/CA.yaml --attack_type CA \
   --target "stop sign" \
   --eval-dataset coco \
   --trigger-source laser \
-  --epochs 20 --train-batch 50 --eval-batch 800 --repeat 20
+  --epochs 20 --eval-batch 800 --repeat 20
 ```
 
 Plan-B ablations compare trigger sources, epoch trigger search, and async-joint:

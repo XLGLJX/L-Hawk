@@ -3,7 +3,7 @@ defaults:
   seed: 0
   eval_dataset: coco
   epochs: 1
-  train_batch: 1
+  train_batch:
   eval_batch: 1
   repeat: 1
   trigger_source: laser
@@ -21,7 +21,6 @@ defaults:
   async_distance_radius: 5
   async_angle_radius: 5
   async_light_radius: 200
-  async_shrink: 0.75
 
 profiles:
   smoke:
@@ -33,7 +32,7 @@ profiles:
     eval_dataset: coco
   full:
     epochs: 20
-    train_batch: 50
+    train_batch:
     eval_batch: 800
     repeat: 20
     trigger_search_batch: 8
