@@ -65,7 +65,12 @@ def compute_iou(bboxes_a: torch.Tensor, bboxes_b: torch.Tensor, xyxy: bool = Tru
     return iou
 
 
-def load_coco(img_path, ann_path):
+def _image_only_collate(batch):
+    images, _ = zip(*batch)
+    return torch.stack(images, 0)
+
+
+def load_coco(img_path, ann_path, batch_size=1):
     return DataLoader(
         tv.datasets.CocoDetection(
             img_path,
@@ -76,7 +81,9 @@ def load_coco(img_path, ann_path):
                 tv.transforms.ToTensor(),
             ]),
         ),
+        batch_size=batch_size,
         shuffle=True,
+        collate_fn=_image_only_collate,
     )
 
 
@@ -484,30 +491,52 @@ def eval_HA(cfg: ConfigParser,
 
 
 
-def _make_boxes(patch: LHawk, pos, model_type, origin_index=None):
-    s = patch.last_scale
-    bbox = [
-        pos[1] + (1-s) * patch.w * 0.5,
-        pos[0] + (1-s) * patch.h * 0.5,
-        pos[1] + (1+s) * patch.w * 0.5,
-        pos[0] + (1+s) * patch.h * 0.5,
-    ]
+def _make_boxes(patch: LHawk, pos, model_type, origin_index=None, batch_size=1, scales=None):
+    if (
+        isinstance(pos, (list, tuple))
+        and len(pos) > 0
+        and isinstance(pos[0], (list, tuple))
+    ):
+        positions = list(pos)
+    else:
+        positions = [pos for _ in range(batch_size)]
+    batch_size = len(positions)
+    if scales is None:
+        scales = [patch.last_scale for _ in range(batch_size)]
+    elif not isinstance(scales, (list, tuple)):
+        scales = [scales for _ in range(batch_size)]
+
+    bboxes = []
+    for p, s in zip(positions, scales):
+        bboxes.append([
+            p[1] + (1 - s) * patch.w * 0.5,
+            p[0] + (1 - s) * patch.h * 0.5,
+            p[1] + (1 + s) * patch.w * 0.5,
+            p[0] + (1 + s) * patch.h * 0.5,
+        ])
+    target = patch.target if origin_index==None else origin_index
     # bbox = [pos[1], pos[0], pos[1]+patch.w, pos[0]+patch.h]
     if model_type == "FAST":
-        _box = torch.tensor([bbox], device=patch.device)
-        _label = torch.tensor([patch.target if origin_index==None else origin_index], device=patch.device)
-        gt_box = [{"boxes": _box, "labels": _label}]
-        dummy_box = [{
+        _label = torch.tensor([target], device=patch.device)
+        gt_box = [
+            {"boxes": torch.tensor([bbox], device=patch.device), "labels": _label.clone()}
+            for bbox in bboxes
+        ]
+        dummy = {
             "boxes": torch.empty((0, 4), dtype=torch.float, device=patch.device),
             "labels": torch.empty((0, ), dtype=torch.long, device=patch.device),
-        }]
+        }
+        dummy_box = [{"boxes": dummy["boxes"].clone(), "labels": dummy["labels"].clone()} for _ in range(batch_size)]
     elif model_type == "YOLO":
-        gt_box = torch.tensor([[0, patch.target if origin_index==None else origin_index, *bbox]], dtype=torch.float, device=patch.device)
+        gt_box = torch.zeros((batch_size, 6), dtype=torch.float, device=patch.device)
+        gt_box[:, 0] = torch.arange(batch_size, dtype=torch.float, device=patch.device)
+        gt_box[:, 1] = target
+        gt_box[:, 2:] = torch.tensor(bboxes, dtype=torch.float, device=patch.device)
         gt_box[:, 2:] = xyxy2cxcywh(gt_box[:, 2:]) / 640
         dummy_box = torch.empty((0, 6), device=patch.device)
     else:
         raise NotImplementedError
-    return gt_box, dummy_box, math.floor(bbox[1]), math.ceil(bbox[3])
+    return gt_box, dummy_box, math.floor(min(bbox[1] for bbox in bboxes)), math.ceil(max(bbox[3] for bbox in bboxes))
 
 
 def train_TA_C(cfg: ConfigParser,
@@ -526,7 +555,11 @@ def train_TA_C(cfg: ConfigParser,
         model.eval()
     total_loss = torch.zeros(1, device=device)
     log_loss = torch.zeros(5, device=device)
-    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=cfg.ATTACKER.TRAIN_BATCH):
+    max_train_batches = getattr(cfg.ATTACKER, "TRAIN_BATCH", None)
+    total_batches = max_train_batches if max_train_batches is not None else len(train_loader)
+    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=total_batches):
+        if max_train_batches is not None and i >= max_train_batches:
+            break
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
         img = img.to(patch.device)
@@ -554,11 +587,8 @@ def train_TA_C(cfg: ConfigParser,
                                      device=device)
             patch.update(loss)
 
-        if (i + 1) == cfg.ATTACKER.TRAIN_BATCH:
-            break
-        else:
-            del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
-            torch.cuda.empty_cache()
+        del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
+        torch.cuda.empty_cache()
 
 def train_TA_D(cfg: ConfigParser,
              patch: LHawk,
@@ -576,19 +606,25 @@ def train_TA_D(cfg: ConfigParser,
         model.eval()
     total_loss = torch.zeros(1, device=device)
     log_loss = torch.zeros(5, device=device)
-    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=cfg.ATTACKER.TRAIN_BATCH):
+    max_train_batches = getattr(cfg.ATTACKER, "TRAIN_BATCH", None)
+    total_batches = max_train_batches if max_train_batches is not None else len(train_loader)
+    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=total_batches):
+        if max_train_batches is not None and i >= max_train_batches:
+            break
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
         img = img.to(patch.device)
+        batch_size = img.size(0)
         h, w = img.shape[-2:]
         random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
         selected_mask = torch.index_select(trigger_mask, 0, random_index)
         for j in range(cfg.ATTACKER.REPEAT):
             pos = patch.random_pos(cfg, (h, w))
             imgn = patch.apply(img, pos, do_random_color=True)
-            gt_box, dummy_box, start_row, end_row = _make_boxes(patch, pos, cfg.DETECTOR.NAME[:4].upper())
+            gt_box, dummy_box, start_row, end_row = _make_boxes(
+                patch, pos, cfg.DETECTOR.NAME[:4].upper(), batch_size=batch_size)
             gt_box_origin, _, _, _ = _make_boxes(patch, pos, cfg.DETECTOR.NAME[:4].upper(),
-                                                 origin_index=cfg.origin_index)
+                                                 origin_index=cfg.origin_index, batch_size=batch_size)
             last_scale = patch.last_scale
             imgp = torch.clamp(torch.add(imgn, selected_mask/255), 0, 1)
 
@@ -605,11 +641,8 @@ def train_TA_D(cfg: ConfigParser,
                                      device=device)
             patch.update(loss)
 
-        if (i + 1) == cfg.ATTACKER.TRAIN_BATCH:
-            break
-        else:
-            del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
-            torch.cuda.empty_cache()
+        del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
+        torch.cuda.empty_cache()
 
 def train_CA(cfg: ConfigParser,
              patch: LHawk,
@@ -627,10 +660,15 @@ def train_CA(cfg: ConfigParser,
         model.eval()
     total_loss = torch.zeros(1, device=device)
     log_loss = torch.zeros(5, device=device)
-    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=cfg.ATTACKER.TRAIN_BATCH):
+    max_train_batches = getattr(cfg.ATTACKER, "TRAIN_BATCH", None)
+    total_batches = max_train_batches if max_train_batches is not None else len(train_loader)
+    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=total_batches):
+        if max_train_batches is not None and i >= max_train_batches:
+            break
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
         img = img.to(patch.device)
+        batch_size = img.size(0)
         h, w = img.shape[-2:]
 
         random_index = torch.randint(0, trigger_mask.size(0), (1,), device=device)
@@ -638,7 +676,8 @@ def train_CA(cfg: ConfigParser,
         for j in range(cfg.ATTACKER.REPEAT):
             pos = patch.random_pos(cfg, (h, w))
             imgn = patch.apply(img, pos, do_random_color=True)
-            gt_box, dummy_box, start_row, end_row = _make_boxes(patch, pos, cfg.DETECTOR.NAME[:4].upper())
+            gt_box, dummy_box, start_row, end_row = _make_boxes(
+                patch, pos, cfg.DETECTOR.NAME[:4].upper(), batch_size=batch_size)
             last_scale = patch.last_scale
             imgp = torch.clamp(torch.add(imgn, selected_mask/255), 0, 1)
 
@@ -655,11 +694,8 @@ def train_CA(cfg: ConfigParser,
                                      device=device)
             patch.update(loss)
 
-        if (i + 1) == cfg.ATTACKER.TRAIN_BATCH:
-            break
-        else:
-            del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
-            torch.cuda.empty_cache()
+        del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
+        torch.cuda.empty_cache()
 
 
 def train_HA(cfg: ConfigParser,
@@ -680,10 +716,15 @@ def train_HA(cfg: ConfigParser,
         model.eval()
     total_loss = torch.zeros(1, device=device)
     log_loss = torch.zeros(5, device=device)
-    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=cfg.ATTACKER.TRAIN_BATCH):
+    max_train_batches = getattr(cfg.ATTACKER, "TRAIN_BATCH", None)
+    total_batches = max_train_batches if max_train_batches is not None else len(train_loader)
+    for i, img in tqdm(enumerate(train_loader), desc=f'Training epoch {e}', total=total_batches):
+        if max_train_batches is not None and i >= max_train_batches:
+            break
         if isinstance(img, list) or isinstance(img, tuple):
             img = img[0]
         img = img.to(patch.device)
+        batch_size = img.size(0)
         h, w = img.shape[-2:]
         random_angle_t = torch.cuda.FloatTensor(cfg.ATTACKER.REPEAT).uniform_(-cfg.ATTACKER.PATCH.ANGLE,
                                                                             cfg.ATTACKER.PATCH.ANGLE)
@@ -695,7 +736,8 @@ def train_HA(cfg: ConfigParser,
             patch2.h = patch2.data.size(2)
             patch2.w = patch2.data.size(3)
             pos = patch2.random_pos(cfg, (h, w))
-            gt_box, dummy_box, start_row, end_row = _make_boxes(patch2, pos, cfg.DETECTOR.NAME[:4].upper())
+            gt_box, dummy_box, start_row, end_row = _make_boxes(
+                patch2, pos, cfg.DETECTOR.NAME[:4].upper(), batch_size=batch_size)
             imgn = patch2.apply(img, pos, do_random_color=False)
             pos2 = [pos[0] + (patch2.h - patch.h) // 2, pos[1] + (patch2.w - patch.w) // 2]
             resize = min(((patch2.h * patch2.w / 5) ** 0.5) / patch.h, 1)
@@ -715,9 +757,5 @@ def train_HA(cfg: ConfigParser,
                                      device=device)
             patch.update(loss)
 
-        if (i + 1) == cfg.ATTACKER.TRAIN_BATCH:
-            break
-        else:
-            del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
-            torch.cuda.empty_cache()
-
+        del imgn, imgp, loss1, loss2, loss3, loss4, loss5, loss
+        torch.cuda.empty_cache()

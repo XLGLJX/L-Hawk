@@ -389,14 +389,15 @@ class YOLOv5(nn.Module):
                 pred = self.model(x)[0]
                 attack_target = int(y[0, 1])
                 scores = pred[..., 4] * pred[..., 5 + attack_target]
-                loss = -torch.log(1 - scores.max())
+                per_image_scores = scores.flatten(1).max(dim=1).values
+                loss = -torch.log(1 - per_image_scores).mean()
             return loss
         else:
             if self.training:
                 pred = self.model(x)
             else:
                 pred = self.model(x)[1]
-            loss = self.compute_loss(pred, y, reverse=reverse)[0]
+            loss = self.compute_loss(pred, y, reverse=reverse)[0] / x.size(0)
             return loss
 
 
@@ -433,14 +434,15 @@ class YOLOv3(nn.Module):
                 pred = self.model(x)[0]
                 attack_target = int(y[0, 1])
                 scores = pred[..., 4] * pred[..., 5 + attack_target]
-                loss = -torch.log(1 - scores.max())
+                per_image_scores = scores.flatten(1).max(dim=1).values
+                loss = -torch.log(1 - per_image_scores).mean()
             return loss
         else:
             if self.training:
                 pred = self.model(x)
             else:
                 pred = self.model(x)[1]
-            loss = self.compute_loss(pred, y, reverse=reverse)[0]
+            loss = self.compute_loss(pred, y, reverse=reverse)[0] / x.size(0)
             return loss
 
 
@@ -474,7 +476,6 @@ class FasterRCNN(nn.Module):
             return ret
         elif hiding:
             x, y = self.model.transform(x, y)
-            attack_target = y[0]["labels"].item()
             features = self.model.backbone(x.tensors)
             if isinstance(features, torch.Tensor):
                 features = OrderedDict([('0', features)])
@@ -496,9 +497,18 @@ class FasterRCNN(nn.Module):
             box_features = self.model.roi_heads.box_head(box_features)
             class_logits, box_regression = self.model.roi_heads.box_predictor(box_features)
 
-            confs = F.softmax(class_logits)
-            scores = scores[0] * confs[:, attack_target]
-            loss = -torch.log(1 - scores.max())
+            confs = F.softmax(class_logits, dim=1)
+            proposal_counts = [len(proposal) for proposal in proposals]
+            split_confs = confs.split(proposal_counts, dim=0)
+            target_scores = []
+            for image_scores, image_confs, target in zip(scores, split_confs, y):
+                if image_scores.numel() == 0:
+                    target_scores.append(confs.new_zeros(()))
+                    continue
+                attack_target = target["labels"][0].item()
+                target_scores.append((image_scores * image_confs[:, attack_target]).max())
+            scores = torch.stack(target_scores) if target_scores else confs.new_zeros(1)
+            loss = -torch.log(1 - scores).mean()
             return loss
         else:
             if not self.training:

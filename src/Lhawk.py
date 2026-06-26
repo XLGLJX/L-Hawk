@@ -46,7 +46,9 @@ def load_imagenet_val(dataset: str,
     )
 
 
-def load_imagenet_one_per_class_val(dataset: str, inc: bool = False) -> DataLoader:
+def load_imagenet_one_per_class_val(dataset: str,
+                                    batch_size: int = 1,
+                                    inc: bool = False) -> DataLoader:
     """Build a deterministic ImageNet-1K validation loader with one image per class."""
     transform = tv.transforms.Compose([
         tv.transforms.Resize(299),
@@ -71,9 +73,9 @@ def load_imagenet_one_per_class_val(dataset: str, inc: bool = False) -> DataLoad
         )
     return DataLoader(
         torch.utils.data.Subset(imagenet, selected_indices),
-        batch_size=1,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=0,
+        num_workers=5 if batch_size >= 10 else 0,
     )
 
 
@@ -215,10 +217,14 @@ class LHawk:
             padding = transform(padding)
         return (1 - switch) * img + switch * padding.clone()
 
-    def update(self, loss: torch.Tensor) -> None:
+    def update(self, loss: torch.Tensor):
         loss.backward()
+        grad_norm = self.data.grad.norm().item()
+        old_data = self.data.data.clone()
         self.opt(self.data)
+        update_l2 = (self.data.data - old_data).norm().item()
         self.data.data.clamp_(0, 1)
+        return grad_norm, update_l2
 
     def mask(self, shape: torch.Size, pos: Tuple[int, int]) -> Tuple[torch.Tensor, torch.Tensor]:
         mask = torch.zeros(shape, dtype=torch.float, device=self.device)
